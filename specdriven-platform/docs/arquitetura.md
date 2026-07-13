@@ -2,30 +2,51 @@
 
 ## Visão
 
-Plataforma cloud SpecDriven para organizar atendimentos (Cliente → Chamado) com tenancy preparado desde o bootstrap.
+Plataforma cloud SpecDriven para organizar atendimentos (Cliente → Chamado) com tenancy multi-consultoria.
+
+**Modelo de negócio:**
+
+```text
+Nós (operador SpecDriven)
+  └── Consultoria (cliente da plataforma)
+        └── Cliente da consultoria (usuário final do portal cliente)
+```
 
 ## Tenancy
 
 | Conceito | Papel |
 |----------|--------|
-| **Organization** | Contêiner raiz (single-org por tenant lógico) |
-| **Client** | N clientes sob a organização |
-| **User** | Pertence à org; role `gestor` \| `consultor` \| `cliente`; `clientId` opcional |
+| **Organization** | Uma consultoria na plataforma (N orgs no Postgres) |
+| **Client** | N clientes finais sob a consultoria |
+| **User** | Pertence à org; papéis `master` \| `admin` \| `gestor` \| `consultor` \| `cliente` |
 | **Ticket** | Sempre com `organizationId` + `clientId` |
 
 Todas as entidades de negócio relevantes carregam **`organizationId`** para isolamento e consultas filtradas.
 
 ```text
-Organization (1)
+Organization (N)
  └── Client (N)
       ├── User (cliente role, opcional)
       └── Ticket (N)
            ├── Comment
            ├── Attachment
-           └── TimeEntry (stub)
- └── User (gestor / consultor)
+           └── TimeEntry
+ └── User (master / admin / gestor / consultor)
  └── Invite
 ```
+
+## Papéis e contexto de sessão
+
+| Papel DB | Nome UX | Escopo |
+|----------|---------|--------|
+| `master` | Master Plataforma | Console `/master`: CRUD consultorias, criar users em qualquer org |
+| `admin` | Master Consultoria | Configuração e operação da própria org (`/settings`, clientes, projetos) |
+| `gestor` / `consultor` | Operação | Fila, aprovações, atendimento |
+| `cliente` | Cliente final | Portal cliente (`apps/web-client`) |
+
+O **master** inicia no **console plataforma** (`isPlatformContext: true`). Para operar uma consultoria, usa **Entrar** na lista → `POST /auth/switch-org` → JWT com `organizationId` da consultoria alvo. **Sair para console** → `POST /auth/exit-org`.
+
+Rotas de provisionamento (`GET|POST /organizations`, `POST /organizations/:id/users`) exigem master em contexto plataforma.
 
 ## Superfícies
 

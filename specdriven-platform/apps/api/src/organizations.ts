@@ -96,6 +96,15 @@ export async function createOrganizationHandler(
       data: {
         name: parsed.data.name.trim(),
         isMasterConsultancy: false,
+        settings: { create: {} },
+        moduleCatalog: {
+          create: {
+            key: "geral",
+            label: "Geral",
+            sortOrder: 0,
+            enabled: true,
+          },
+        },
       },
       select: orgPublicSelect,
     });

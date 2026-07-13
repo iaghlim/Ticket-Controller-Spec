@@ -60,6 +60,19 @@ function getClient(): S3Client {
   return client;
 }
 
+export async function checkStorageHealth(): Promise<boolean> {
+  if (!isStorageConfigured()) return true;
+  const cfg = getStorageConfig();
+  if (!cfg) return true;
+  try {
+    const s3 = getClient();
+    await s3.send(new HeadBucketCommand({ Bucket: cfg.bucket }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function ensureBucket(): Promise<void> {
   if (!isStorageConfigured() || ensuredBucket) return;
   const cfg = getStorageConfig();

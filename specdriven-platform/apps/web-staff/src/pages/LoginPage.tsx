@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { isPlatformMaster } from "../lib/session";
 
 export function LoginPage() {
   const { user, loading, login } = useAuth();
@@ -10,13 +11,23 @@ export function LoginPage() {
   const from =
     (location.state as { from?: string } | null)?.from ?? "/";
 
-  const [email, setEmail] = useState("gestor@specdriven.local");
-  const [password, setPassword] = useState("changeme");
+  function postLoginPath(roleUser: { role: string; isPlatformContext?: boolean }) {
+    if (isPlatformMaster(roleUser as import("../lib/api").AuthUser)) {
+      return "/master";
+    }
+    return from === "/master" ? "/" : from;
+  }
+  const flashMessage = (location.state as { message?: string } | null)?.message;
+
+  const [email, setEmail] = useState(
+    import.meta.env.PROD ? "" : "gestor@specdriven.local",
+  );
+  const [password, setPassword] = useState(import.meta.env.PROD ? "" : "changeme");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   if (!loading && user) {
-    return <Navigate to={from} replace />;
+    return <Navigate to={postLoginPath(user)} replace />;
   }
 
   async function onSubmit(e: FormEvent) {
@@ -24,8 +35,8 @@ export function LoginPage() {
     setError(null);
     setSubmitting(true);
     try {
-      await login(email.trim(), password);
-      navigate(from, { replace: true });
+      const loggedIn = await login(email.trim(), password);
+      navigate(postLoginPath(loggedIn), { replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
         setError(
@@ -75,13 +86,19 @@ export function LoginPage() {
             />
           </div>
           {error ? <p className="error">{error}</p> : null}
+          {flashMessage ? <p className="ok-text">{flashMessage}</p> : null}
           <button className="btn" type="submit" disabled={submitting}>
             {submitting ? "Entrando…" : "Entrar"}
           </button>
         </form>
-        <p className="muted" style={{ marginTop: "1rem", fontSize: "0.8rem" }}>
-          Seed: master@blendit.local, admin@blendit.local, gestor@specdriven.local / changeme
+        <p className="muted" style={{ marginTop: "0.75rem", fontSize: "0.85rem" }}>
+          <Link to="/forgot-password">Esqueci minha senha</Link>
         </p>
+        {!import.meta.env.PROD ? (
+          <p className="muted" style={{ marginTop: "1rem", fontSize: "0.8rem" }}>
+            Seed: master@blendit.local, admin@blendit.local, gestor@specdriven.local / changeme
+          </p>
+        ) : null}
       </div>
     </div>
   );

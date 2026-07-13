@@ -19,8 +19,8 @@ export const STATUS_LABELS: Record<TicketStatus, string> = {
 };
 
 export const ROLE_LABELS: Record<UserRole, string> = {
-  master: "Master",
-  admin: "Administrador",
+  master: "Master da plataforma",
+  admin: "Master da consultoria",
   gestor: "Gestor",
   consultor: "Consultor",
   cliente: "Cliente",
@@ -96,4 +96,24 @@ export function formatMinutes(min: number | null | undefined): string {
   const h = Math.floor(n / 60);
   const m = n % 60;
   return m > 0 ? `${h}h ${m}min` : `${h}h`;
+}
+
+/** Horas decimais → "12,5h". */
+export function formatHours(hours: number | null | undefined): string {
+  if (hours == null || Number.isNaN(hours)) return "—";
+  return `${hours.toFixed(1).replace(".", ",")}h`;
+}
+
+/** Centavos → moeda BRL. */
+export function formatCents(cents: number | null | undefined): string {
+  if (cents == null || Number.isNaN(cents)) return "—";
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(cents / 100);
+}
+
+/** Segundos → horas decimais formatadas. */
+export function formatSecondsAsHours(seconds: number): string {
+  return formatHours(seconds / 3600);
 }

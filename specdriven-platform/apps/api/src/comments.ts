@@ -3,7 +3,12 @@ import { z } from "zod";
 import { CommentVisibilitySchema, TicketKeySchema } from "@specdriven/shared";
 import { requireAuth, type AuthUser } from "./auth.js";
 import { isDbUnavailableError, prisma } from "./db.js";
+import { isStaff } from "./permissions.js";
 import { createNotification } from "./notifications.js";
+import {
+  notifyClientOnStaffPublicComment,
+  notifyStaffOnClientComment,
+} from "./ticket-notifications.js";
 
 const CreateCommentSchema = z.object({
   body: z.string().min(1),
@@ -113,32 +118,40 @@ export async function createCommentHandler(
       },
     });
 
-    if (ticket.assigneeId && ticket.assigneeId !== user.id) {
-      await createNotification({
-        organizationId: user.organizationId,
-        userId: ticket.assigneeId,
-        title: `Novo comentário em ${ticket.key}`,
-        body: parsed.data.body.slice(0, 160),
-        href: `/tickets/${ticket.key}`,
-      });
-    } else if (user.role === "cliente" && visibility === "public") {
-      const staff = await prisma.user.findMany({
-        where: {
-          organizationId: user.organizationId,
-          role: { in: ["gestor", "consultor"] },
-        },
-        select: { id: true },
-        take: 20,
-      });
-      for (const s of staff) {
+    if (visibility === "internal") {
+      if (ticket.assigneeId && ticket.assigneeId !== user.id) {
         await createNotification({
           organizationId: user.organizationId,
-          userId: s.id,
-          title: `Cliente comentou em ${ticket.key}`,
+          userId: ticket.assigneeId,
+          title: `Novo comentário interno em ${ticket.key}`,
           body: parsed.data.body.slice(0, 160),
           href: `/tickets/${ticket.key}`,
         });
       }
+    } else if (isStaff(user)) {
+      if (ticket.assigneeId && ticket.assigneeId !== user.id) {
+        await createNotification({
+          organizationId: user.organizationId,
+          userId: ticket.assigneeId,
+          title: `Novo comentário em ${ticket.key}`,
+          body: parsed.data.body.slice(0, 160),
+          href: `/tickets/${ticket.key}`,
+        });
+      }
+      await notifyClientOnStaffPublicComment({
+        organizationId: user.organizationId,
+        clientId: ticket.clientId,
+        ticketKey: ticket.key,
+        body: parsed.data.body,
+      });
+    } else if (user.role === "cliente") {
+      await notifyStaffOnClientComment({
+        organizationId: user.organizationId,
+        ticketKey: ticket.key,
+        assigneeId: ticket.assigneeId,
+        authorId: user.id,
+        body: parsed.data.body,
+      });
     }
 
     return reply.status(201).send({ comment });

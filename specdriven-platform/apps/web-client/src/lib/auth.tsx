@@ -10,11 +10,14 @@ import {
 import {
   ApiError,
   getStoredToken,
+  isStaffRole,
   login as apiLogin,
   me,
   setStoredToken,
   type AuthUser,
 } from "./api";
+
+const STAFF_PORTAL_MESSAGE = "Use o portal de consultoria.";
 
 type AuthState = {
   user: AuthUser | null;
@@ -25,6 +28,13 @@ type AuthState = {
 };
 
 const AuthContext = createContext<AuthState | null>(null);
+
+function assertCliente(user: AuthUser): AuthUser {
+  if (isStaffRole(user.role)) {
+    throw new ApiError(403, { error: "cliente_only" }, STAFF_PORTAL_MESSAGE);
+  }
+  return user;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -45,12 +55,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       try {
         const { user: u } = await me(stored);
+        assertCliente(u);
         if (!cancelled) {
           setUser(u);
           setToken(stored);
         }
       } catch (err) {
-        if (err instanceof ApiError && err.status === 401) {
+        if (
+          err instanceof ApiError &&
+          (err.status === 401 || err.status === 403)
+        ) {
           setStoredToken(null);
         }
         if (!cancelled) {
@@ -69,6 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const res = await apiLogin(email, password);
+    assertCliente(res.user);
     setStoredToken(res.token);
     setToken(res.token);
     setUser(res.user);

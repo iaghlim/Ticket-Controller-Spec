@@ -1,11 +1,6 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import {
-  TICKET_MODULES,
-  TICKET_TYPES,
-  type TicketModule,
-  type TicketType,
-} from "@specdriven/shared";
+import { TICKET_TYPES, type TicketType } from "@specdriven/shared";
 import {
   ApiError,
   createAttachmentMeta,
@@ -16,26 +11,36 @@ import {
 } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useClientContext } from "../lib/useClientContext";
+import { usePortalSettings } from "../lib/usePortalSettings";
 import { moduleLabel, ticketTypeLabel } from "../lib/labels";
 
-function parseTicketType(value: string | null): TicketType | null {
+function parseTicketType(
+  value: string | null,
+  allowed: TicketType[],
+): TicketType | null {
   if (!value) return null;
-  return TICKET_TYPES.includes(value as TicketType)
-    ? (value as TicketType)
-    : null;
+  return allowed.includes(value as TicketType) ? (value as TicketType) : null;
 }
 
 export function NewTicketPage() {
   const { user } = useAuth();
   const { clientName } = useClientContext();
+  const { settings: portalSettings, loading: portalLoading } = usePortalSettings();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const [companyName, setCompanyName] = useState("");
-  const [ticketType, setTicketType] = useState<TicketType>(
-    () => parseTicketType(searchParams.get("type")) ?? "melhoria",
+  const enabledTypes = useMemo(
+    () => portalSettings?.enabledTicketTypes ?? [...TICKET_TYPES],
+    [portalSettings],
   );
-  const [module, setModule] = useState<TicketModule>("geral");
+  const enabledModules = useMemo(
+    () => portalSettings?.enabledModules ?? [{ key: "geral", label: "Geral" }],
+    [portalSettings],
+  );
+
+  const [companyName, setCompanyName] = useState("");
+  const [ticketType, setTicketType] = useState<TicketType>("melhoria");
+  const [module, setModule] = useState("geral");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -45,9 +50,21 @@ export function NewTicketPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    const fromQuery = parseTicketType(searchParams.get("type"));
-    if (fromQuery) setTicketType(fromQuery);
-  }, [searchParams]);
+    if (enabledTypes.length === 0) return;
+    const fromQuery = parseTicketType(searchParams.get("type"), enabledTypes);
+    if (fromQuery) {
+      setTicketType(fromQuery);
+    } else if (!enabledTypes.includes(ticketType)) {
+      setTicketType(enabledTypes[0]!);
+    }
+  }, [searchParams, enabledTypes, ticketType]);
+
+  useEffect(() => {
+    if (enabledModules.length === 0) return;
+    if (!enabledModules.some((m) => m.key === module)) {
+      setModule(enabledModules[0]!.key);
+    }
+  }, [enabledModules, module]);
 
   useEffect(() => {
     let cancelled = false;
@@ -135,6 +152,8 @@ export function NewTicketPage() {
     }
   }
 
+  const formLoading = loadingMeta || portalLoading;
+
   return (
     <>
       <div className="page-head">
@@ -159,12 +178,13 @@ export function NewTicketPage() {
           <div className="field">
             <label>Tipo de chamado</label>
             <div className="type-picker">
-              {TICKET_TYPES.map((t) => (
+              {enabledTypes.map((t) => (
                 <button
                   key={t}
                   type="button"
                   className={`type-picker-item${ticketType === t ? " active" : ""}`}
                   onClick={() => setTicketType(t)}
+                  disabled={formLoading}
                 >
                   {ticketTypeLabel(t)}
                 </button>
@@ -180,7 +200,7 @@ export function NewTicketPage() {
               onChange={(e) => setCompanyName(e.target.value)}
               required
               minLength={1}
-              disabled={loadingMeta}
+              disabled={formLoading}
               placeholder="Razão social ou nome fantasia"
             />
           </div>
@@ -190,12 +210,13 @@ export function NewTicketPage() {
             <select
               id="module"
               value={module}
-              onChange={(e) => setModule(e.target.value as TicketModule)}
+              onChange={(e) => setModule(e.target.value)}
               required
+              disabled={formLoading}
             >
-              {TICKET_MODULES.map((m) => (
-                <option key={m} value={m}>
-                  {moduleLabel(m)}
+              {enabledModules.map((m) => (
+                <option key={m.key} value={m.key}>
+                  {moduleLabel(m.key, { [m.key]: m.label })}
                 </option>
               ))}
             </select>
@@ -250,7 +271,7 @@ export function NewTicketPage() {
               Chamado vinculado à {clientName}
             </span>
             {error ? <p className="error">{error}</p> : null}
-            <button className="btn" type="submit" disabled={submitting || loadingMeta}>
+            <button className="btn" type="submit" disabled={submitting || formLoading}>
               {submitting ? "Enviando…" : "Enviar chamado"}
             </button>
           </div>

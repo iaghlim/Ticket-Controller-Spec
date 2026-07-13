@@ -3,21 +3,29 @@ import { z } from "zod";
 import { TicketKeySchema } from "@specdriven/shared";
 import { requireAuth, type AuthUser } from "./auth.js";
 import { isDbUnavailableError, prisma } from "./db.js";
-import { isStaff } from "./permissions.js";
+import { canManageSettings, isStaff } from "./permissions.js";
 
 const CreateTagSchema = z.object({
   name: z.string().min(1).max(64),
   color: z.string().min(1).max(32).optional().nullable(),
+  visibleToClient: z.boolean().optional(),
 });
 
 const PatchTagSchema = z
   .object({
     name: z.string().min(1).max(64).optional(),
     color: z.string().min(1).max(32).nullable().optional(),
+    visibleToClient: z.boolean().optional(),
   })
-  .refine((b) => b.name !== undefined || b.color !== undefined, {
-    message: "Informe name e/ou color",
-  });
+  .refine(
+    (b) =>
+      b.name !== undefined ||
+      b.color !== undefined ||
+      b.visibleToClient !== undefined,
+    {
+      message: "Informe name, color e/ou visibleToClient",
+    },
+  );
 
 const AssignTagsSchema = z.object({
   tagIds: z.array(z.string().uuid()),
@@ -73,8 +81,8 @@ export async function createTagHandler(
 ) {
   const user = await requireAuth(request, reply);
   if (!user) return;
-  if (!isStaff(user)) {
-    return reply.status(403).send({ error: "forbidden_staff_only" });
+  if (!canManageSettings(user)) {
+    return reply.status(403).send({ error: "forbidden_role" });
   }
   if (!requireDbOrg(user, reply)) return;
 
@@ -92,6 +100,7 @@ export async function createTagHandler(
         organizationId: user.organizationId,
         name: parsed.data.name.trim(),
         color: parsed.data.color ?? null,
+        visibleToClient: parsed.data.visibleToClient ?? false,
       },
     });
     return reply.status(201).send({ tag });
@@ -111,8 +120,8 @@ export async function patchTagHandler(
 ) {
   const user = await requireAuth(request, reply);
   if (!user) return;
-  if (!isStaff(user)) {
-    return reply.status(403).send({ error: "forbidden_staff_only" });
+  if (!canManageSettings(user)) {
+    return reply.status(403).send({ error: "forbidden_role" });
   }
   if (!requireDbOrg(user, reply)) return;
 
@@ -142,6 +151,9 @@ export async function patchTagHandler(
           ? { name: parsed.data.name.trim() }
           : {}),
         ...(parsed.data.color !== undefined ? { color: parsed.data.color } : {}),
+        ...(parsed.data.visibleToClient !== undefined
+          ? { visibleToClient: parsed.data.visibleToClient }
+          : {}),
       },
     });
     return { tag };
@@ -161,8 +173,8 @@ export async function deleteTagHandler(
 ) {
   const user = await requireAuth(request, reply);
   if (!user) return;
-  if (!isStaff(user)) {
-    return reply.status(403).send({ error: "forbidden_staff_only" });
+  if (!canManageSettings(user)) {
+    return reply.status(403).send({ error: "forbidden_role" });
   }
   if (!requireDbOrg(user, reply)) return;
 
@@ -221,7 +233,11 @@ export async function listTicketTagsHandler(
       include: { tag: true },
       orderBy: { tag: { name: "asc" } },
     });
-    return { tags: rows.map((r) => r.tag) };
+    const tags =
+      user.role === "cliente"
+        ? rows.map((r) => r.tag).filter((t) => t.visibleToClient)
+        : rows.map((r) => r.tag);
+    return { tags };
   } catch (err) {
     if (isDbUnavailableError(err)) return dbUnavailable(reply);
     throw err;

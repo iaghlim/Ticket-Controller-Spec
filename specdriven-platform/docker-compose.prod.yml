@@ -1,0 +1,117 @@
+# Produção — defina variáveis em .env (veja .env.production.example).
+# Uso: docker compose -f docker-compose.prod.yml up -d
+# MinIO opcional: docker compose -f docker-compose.prod.yml --profile storage up -d
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - specdriven_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    profiles: ["storage"]
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY}
+    command: server /data --console-address ":9001"
+    volumes:
+      - specdriven_minio:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  minio-init:
+    image: minio/mc:latest
+    profiles: ["storage"]
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
+      S3_BUCKET: ${S3_BUCKET:-specdriven}
+    entrypoint: ["/bin/sh", "/scripts/minio-init.sh"]
+    volumes:
+      - ./docker/minio-init.sh:/scripts/minio-init.sh:ro
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      PORT: ${PORT:-3000}
+      HOST: ${HOST:-0.0.0.0}
+    ports:
+      - "${API_PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  web-client:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.vite-spa
+      args:
+        APP_DIR: web-client
+        VITE_API_URL: ${VITE_API_URL_CLIENT}
+    restart: unless-stopped
+    ports:
+      - "${WEB_CLIENT_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  web-staff:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.vite-spa
+      args:
+        APP_DIR: web-staff
+        VITE_API_URL: ${VITE_API_URL_STAFF}
+    restart: unless-stopped
+    ports:
+      - "${WEB_STAFF_PORT:-8081}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  specdriven_pgdata:
+  specdriven_minio:

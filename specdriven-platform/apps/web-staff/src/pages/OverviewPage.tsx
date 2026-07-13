@@ -2,14 +2,19 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   TICKET_TYPES,
+  computePeriodSlaPct,
   operationsCenterLabel,
+  overviewPeriodRange,
   type Client,
+  type OverviewPeriod,
   type Ticket,
   type TicketType,
   type User,
 } from "@specdriven/shared";
 import {
   ApiError,
+  getBillingSummary,
+  getSettings,
   listApprovals,
   listClients,
   listTickets,
@@ -19,11 +24,18 @@ import {
 import { useAuth } from "../lib/auth";
 import {
   NOT_CONFIGURED,
+  formatHours,
   priorityLabel,
   shortId,
   statusLabel,
   ticketTypeLabel,
 } from "../lib/labels";
+
+const PERIOD_OPTIONS: { value: OverviewPeriod; label: string }[] = [
+  { value: "current_month", label: "Mês atual" },
+  { value: "previous_month", label: "Mês anterior" },
+  { value: "quarter", label: "Trimestre" },
+];
 
 const LIFECYCLE_META: Record<
   TicketType,
@@ -92,8 +104,15 @@ export function OverviewPage() {
   const [pendingApprovals, setPendingApprovals] = useState(0);
   const [pendingHoursSeconds, setPendingHoursSeconds] = useState(0);
   const [reportTotal, setReportTotal] = useState(0);
+  const [baselineRemainingHours, setBaselineRemainingHours] = useState<
+    number | null
+  >(null);
+  const [slaTargetPct, setSlaTargetPct] = useState(90);
+  const [period, setPeriod] = useState<OverviewPeriod>("current_month");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const periodMeta = useMemo(() => overviewPeriodRange(period), [period]);
 
   useEffect(() => {
     let cancelled = false;
@@ -101,17 +120,20 @@ export function OverviewPage() {
       setLoading(true);
       setError(null);
       try {
-        const [t, c, u, approvals, report] = await Promise.all([
+        const { from, to } = periodMeta;
+        const [t, c, u, approvals, report, settingsRes] = await Promise.all([
           listTickets(),
           listClients(),
           listUsers(["gestor", "consultor"]),
           listApprovals({ status: "pending" }),
           ticketsReport(),
+          getSettings(),
         ]);
         if (cancelled) return;
         setTickets(t.tickets);
         setClients(c.clients);
         setStaffUsers(u.users);
+        setSlaTargetPct(settingsRes.settings.slaTargetPct ?? 90);
         setPendingApprovals(approvals.approvals.length);
         const timeEntries = approvals.approvals.filter(
           (a) => a.kind === "time_entry",
@@ -123,6 +145,25 @@ export function OverviewPage() {
           }, 0),
         );
         setReportTotal(report.total);
+
+        const withBaseline = c.clients.filter(
+          (cl) => cl.baselineHoursMonth != null && cl.baselineHoursMonth > 0,
+        );
+        setBaselineRemainingHours(null);
+        if (withBaseline.length > 0) {
+          const summaries = await Promise.allSettled(
+            withBaseline.map((cl) => getBillingSummary(cl.id, from, to)),
+          );
+          let totalRemaining = 0;
+          let hasRemaining = false;
+          for (const res of summaries) {
+            if (res.status === "fulfilled" && res.value.baselineRemaining != null) {
+              totalRemaining += res.value.baselineRemaining;
+              hasRemaining = true;
+            }
+          }
+          if (hasRemaining) setBaselineRemainingHours(totalRemaining);
+        }
       } catch (err) {
         if (!cancelled) {
           setError(
@@ -139,7 +180,7 @@ export function OverviewPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [periodMeta]);
 
   const clientName = useMemo(() => {
     const map = new Map(clients.map((c) => [c.id, c.name]));
@@ -160,14 +201,8 @@ export function OverviewPage() {
   );
 
   const slaOkPct = useMemo(() => {
-    const withSla = openTickets.filter((t) => t.slaDueAt);
-    if (withSla.length === 0) return null;
-    const ok = withSla.filter((t) => {
-      const due = new Date(t.slaDueAt!);
-      return due.getTime() > Date.now();
-    }).length;
-    return Math.round((ok / withSla.length) * 1000) / 10;
-  }, [openTickets]);
+    return computePeriodSlaPct(tickets, periodMeta.from, periodMeta.to);
+  }, [tickets, periodMeta]);
 
   const slaAtRisk = useMemo(() => {
     return openTickets.filter((t) => {
@@ -233,9 +268,22 @@ export function OverviewPage() {
           </p>
         </div>
         <div className="page-head-actions">
-          <span className="page-head-unconfigured">
-            Período · <span className="unconfigured-label">{NOT_CONFIGURED}</span>
-          </span>
+          <label className="field" style={{ margin: 0 }}>
+            <span className="muted" style={{ marginRight: "0.5rem" }}>
+              Período
+            </span>
+            <select
+              value={period}
+              onChange={(e) => setPeriod(e.target.value as OverviewPeriod)}
+              aria-label="Período dos indicadores"
+            >
+              {PERIOD_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       </div>
 
@@ -265,15 +313,21 @@ export function OverviewPage() {
                   <span className="unconfigured-label">{NOT_CONFIGURED}</span>
                 )}
               </p>
-              <p className="kpi-card-note">meta ≥ 90%</p>
+              <p className="kpi-card-note">meta ≥ {slaTargetPct}%</p>
             </div>
             <div className="kpi-card">
               <span className="kpi-card-icon">◷</span>
-              <p className="kpi-card-label">Tempo de resposta</p>
+              <p className="kpi-card-label">Baseline restante</p>
               <p className="kpi-card-value">
-                <span className="unconfigured-label">{NOT_CONFIGURED}</span>
+                {baselineRemainingHours != null ? (
+                  formatHours(baselineRemainingHours)
+                ) : (
+                  <span className="unconfigured-label">{NOT_CONFIGURED}</span>
+                )}
               </p>
-              <p className="kpi-card-note">média do período</p>
+              <p className="kpi-card-note">
+                soma dos clientes · {periodMeta.label.toLowerCase()}
+              </p>
             </div>
             <div className="kpi-card">
               <span className="kpi-card-icon">◴</span>
@@ -436,11 +490,18 @@ export function OverviewPage() {
                   </div>
                 </div>
                 <Link
-                  to="/reports"
+                  to="/billing"
+                  className="btn btn-ghost btn-sm"
+                  style={{ width: "100%", marginBottom: "0.35rem" }}
+                >
+                  Baseline &amp; faturamento →
+                </Link>
+                <Link
+                  to="/sla-policies"
                   className="btn btn-ghost btn-sm"
                   style={{ width: "100%" }}
                 >
-                  Gerenciar SLA &amp; Baseline →
+                  Políticas de SLA →
                 </Link>
               </section>
 

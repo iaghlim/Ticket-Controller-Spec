@@ -5,14 +5,20 @@ import {
   TicketStatusSchema,
   TicketTypeSchema,
   TicketPrioritySchema,
-  TicketModuleSchema,
 } from "@specdriven/shared";
 import { requireAuth, type AuthUser } from "./auth.js";
 import { isDbUnavailableError, prisma } from "./db.js";
-import { sendTicketStatusEmail } from "./mail.js";
 import { isStaff } from "./permissions.js";
+import {
+  getEnabledTicketTypesForOrg,
+  isModuleEnabledForOrg,
+} from "./settings.js";
 import { computeSlaDueAt } from "./sla.js";
 import { recordStatusChange } from "./ticket-history.js";
+import {
+  notifyClientOnStatusChange,
+  notifyClientOnTicketCreated,
+} from "./ticket-notifications.js";
 
 const CreateTicketSchema = z.object({
   key: TicketKeySchema.optional(),
@@ -24,7 +30,7 @@ const CreateTicketSchema = z.object({
   estimateMinutes: z.number().int().nonnegative().optional().nullable(),
   ticketType: TicketTypeSchema.optional(),
   companyName: z.string().min(1).optional().nullable(),
-  module: TicketModuleSchema.optional().nullable(),
+  module: z.string().min(1).optional().nullable(),
   countsTowardBaseline: z.boolean().optional(),
 });
 
@@ -187,6 +193,28 @@ export async function createTicketHandler(
       return reply.status(404).send({ error: "client_not_found" });
     }
 
+    const ticketType = parsed.data.ticketType ?? "melhoria";
+    const enabledTypes = await getEnabledTicketTypesForOrg(user.organizationId);
+    if (!enabledTypes.includes(ticketType)) {
+      return reply.status(400).send({
+        error: "ticket_type_disabled",
+        message: "Tipo de chamado não habilitado para esta consultoria.",
+      });
+    }
+
+    if (parsed.data.module) {
+      const moduleOk = await isModuleEnabledForOrg(
+        user.organizationId,
+        parsed.data.module,
+      );
+      if (!moduleOk) {
+        return reply.status(400).send({
+          error: "module_disabled",
+          message: "Módulo não habilitado no catálogo da consultoria.",
+        });
+      }
+    }
+
     // Cliente nunca escolhe a key; staff pode omitir para auto-gerar.
     const autoKey =
       user.role === "cliente" || !parsed.data.key
@@ -216,7 +244,7 @@ export async function createTicketHandler(
         status,
         priority,
         estimateMinutes: parsed.data.estimateMinutes ?? null,
-        ticketType: parsed.data.ticketType ?? "melhoria",
+        ticketType,
         companyName: parsed.data.companyName ?? null,
         module: parsed.data.module ?? null,
         countsTowardBaseline: parsed.data.countsTowardBaseline ?? true,
@@ -232,6 +260,15 @@ export async function createTicketHandler(
       changedById: user.id,
       note: "ticket_created",
     });
+
+    if (user.role === "cliente") {
+      await notifyClientOnTicketCreated({
+        organizationId: user.organizationId,
+        clientId: parsed.data.clientId,
+        ticketKey: ticket.key,
+        authorUserId: user.id,
+      });
+    }
 
     return reply.status(201).send({ ticket });
   } catch (err) {
@@ -412,7 +449,6 @@ export async function patchTicketHandler(
     });
 
     let history = null;
-    let mail = null;
     if (statusChanging && nextStatus) {
       history = await recordStatusChange({
         ticketId: ticket.id,
@@ -421,21 +457,16 @@ export async function patchTicketHandler(
         changedById: user.id,
       });
 
-      const notifyTo =
-        ticket.client.users[0]?.email ??
-        process.env.MAIL_NOTIFY_FALLBACK ??
-        null;
-      if (notifyTo) {
-        mail = await sendTicketStatusEmail({
-          to: notifyTo,
-          ticketKey: updated.key,
-          fromStatus: previousStatus,
-          toStatus: updated.status,
-        });
-      }
+      await notifyClientOnStatusChange({
+        organizationId: ticket.organizationId,
+        clientId: ticket.clientId,
+        ticketKey: updated.key,
+        fromStatus: previousStatus,
+        toStatus: updated.status,
+      });
     }
 
-    return { ticket: updated, history, mail };
+    return { ticket: updated, history };
   } catch (err) {
     if (isDbUnavailableError(err)) return dbUnavailable(reply);
     throw err;

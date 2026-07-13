@@ -5,6 +5,7 @@ import { z } from "zod";
 import { UserRoleSchema } from "@specdriven/shared";
 import { requireAuth } from "./auth.js";
 import { isDbUnavailableError, prisma } from "./db.js";
+import { shouldReturnInviteToken } from "./hardening.js";
 import { sendInviteEmail } from "./mail.js";
 import { canInvite, isStaff } from "./permissions.js";
 
@@ -52,6 +53,16 @@ export async function listInvitesHandler(
       where: { organizationId: user.organizationId },
       orderBy: { createdAt: "desc" },
       take: 200,
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        clientId: true,
+        expiresAt: true,
+        createdAt: true,
+        acceptedAt: true,
+        ...(shouldReturnInviteToken() ? { token: true } : {}),
+      },
     });
     return { invites };
   } catch (err) {
@@ -154,20 +165,24 @@ export async function createInviteHandler(
       role: invite.role,
       token: invite.token,
       expiresAt: invite.expiresAt,
+      organizationId: user.organizationId,
     });
 
+    const invitePayload: Record<string, unknown> = {
+      id: invite.id,
+      email: invite.email,
+      role: invite.role,
+      clientId: invite.clientId,
+      expiresAt: invite.expiresAt,
+      createdAt: invite.createdAt,
+      acceptedAt: invite.acceptedAt,
+    };
+    if (shouldReturnInviteToken()) {
+      invitePayload.token = invite.token;
+    }
+
     return reply.status(201).send({
-      invite: {
-        id: invite.id,
-        email: invite.email,
-        role: invite.role,
-        clientId: invite.clientId,
-        expiresAt: invite.expiresAt,
-        createdAt: invite.createdAt,
-        acceptedAt: invite.acceptedAt,
-        // Token returned once for local/dev smoke (also emailed via stub).
-        token: invite.token,
-      },
+      invite: invitePayload,
       mail,
     });
   } catch (err) {

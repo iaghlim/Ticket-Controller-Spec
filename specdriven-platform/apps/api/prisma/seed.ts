@@ -28,6 +28,39 @@ async function main() {
     },
   });
 
+  await prisma.organizationSettings.upsert({
+    where: { organizationId: org.id },
+    update: {
+      supportEmail: "suporte@blendit.local",
+      supportPolicyText:
+        "Atendimento em dias úteis, das 9h às 18h. Respostas em até 1 dia útil.",
+      emailFromName: "Blend IT Suporte",
+      emailReplyTo: "suporte@blendit.local",
+    },
+    create: {
+      organizationId: org.id,
+      supportEmail: "suporte@blendit.local",
+      supportPolicyText:
+        "Atendimento em dias úteis, das 9h às 18h. Respostas em até 1 dia útil.",
+      emailFromName: "Blend IT Suporte",
+      emailReplyTo: "suporte@blendit.local",
+    },
+  });
+
+  await prisma.ticketModuleCatalog.upsert({
+    where: {
+      organizationId_key: { organizationId: org.id, key: "geral" },
+    },
+    update: { label: "Geral", enabled: true },
+    create: {
+      organizationId: org.id,
+      key: "geral",
+      label: "Geral",
+      sortOrder: 0,
+      enabled: true,
+    },
+  });
+
   const client = await prisma.client.upsert({
     where: { id: "00000000-0000-4000-8000-000000000002" },
     update: { name: "Cliente Demo", code: "DEMO" },

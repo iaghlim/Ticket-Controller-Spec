@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "../lib/api";
 import { useAuth } from "../lib/auth";
 
@@ -16,9 +16,12 @@ export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const from = (location.state as { from?: string } | null)?.from ?? "/";
+  const flashMessage = (location.state as { message?: string } | null)?.message;
 
-  const [email, setEmail] = useState("cliente@specdriven.local");
-  const [password, setPassword] = useState("changeme");
+  const [email, setEmail] = useState(
+    import.meta.env.PROD ? "" : "cliente@specdriven.local",
+  );
+  const [password, setPassword] = useState(import.meta.env.PROD ? "" : "changeme");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -38,7 +41,9 @@ export function LoginPage() {
         setError(
           err.status === 401
             ? "E-mail ou senha inválidos."
-            : err.message,
+            : err.status === 403
+              ? "Use o portal de consultoria."
+              : err.message,
         );
       } else {
         setError("Falha ao conectar na API. Verifique se ela está no ar.");
@@ -86,13 +91,19 @@ export function LoginPage() {
             />
           </div>
           {error ? <p className="error">{error}</p> : null}
+          {flashMessage ? <p className="ok-text">{flashMessage}</p> : null}
           <button className="btn btn-block" type="submit" disabled={submitting}>
             {submitting ? "Entrando…" : "Entrar"}
           </button>
         </form>
         <p className="muted login-hint">
-          Seed local: cliente@specdriven.local / changeme
+          <Link to="/forgot-password">Esqueci minha senha</Link>
         </p>
+        {!import.meta.env.PROD ? (
+          <p className="muted login-hint">
+            Seed local: cliente@specdriven.local / changeme
+          </p>
+        ) : null}
       </div>
     </div>
   );

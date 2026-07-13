@@ -1,4 +1,9 @@
-import type { TicketModule, TicketPriority, TicketStatus, TicketType } from "@specdriven/shared";
+import type {
+  SlaState,
+  TicketPriority,
+  TicketStatus,
+  TicketType,
+} from "@specdriven/shared";
 
 export const NOT_CONFIGURED = "não configurado";
 
@@ -18,16 +23,20 @@ export const TICKET_TYPE_LABELS: Record<TicketType, string> = {
   problema: "Problema",
 };
 
-export const MODULE_LABELS: Record<TicketModule, string> = {
-  geral: "Geral",
-};
+export function moduleLabel(
+  module: string,
+  catalogLabels?: Record<string, string>,
+): string {
+  if (catalogLabels?.[module]) return catalogLabels[module];
+  return module.charAt(0).toUpperCase() + module.slice(1).replace(/_/g, " ");
+}
 
 export function statusLabel(status: TicketStatus): string {
   return STATUS_LABELS[status] ?? status;
 }
 
-export function ticketTypeLabel(type: TicketType): string {
-  return TICKET_TYPE_LABELS[type] ?? type;
+export function ticketTypeLabel(type: TicketType | string): string {
+  return TICKET_TYPE_LABELS[type as TicketType] ?? type;
 }
 
 export const PRIORITY_LABELS: Record<TicketPriority, string> = {
@@ -42,10 +51,6 @@ export function priorityLabel(priority: string | null | undefined): string {
   return PRIORITY_LABELS[priority as TicketPriority] ?? priority;
 }
 
-export function moduleLabel(module: TicketModule): string {
-  return MODULE_LABELS[module] ?? module;
-}
-
 export function formatDate(value: string | Date): string {
   const d = typeof value === "string" ? new Date(value) : value;
   if (Number.isNaN(d.getTime())) return "—";
@@ -53,4 +58,25 @@ export function formatDate(value: string | Date): string {
     dateStyle: "short",
     timeStyle: "short",
   }).format(d);
+}
+
+export const SLA_STATE_LABELS: Record<SlaState, string> = {
+  ok: "No prazo",
+  breached: "Violado",
+  paused: "Pausado",
+  done: "Concluído",
+};
+
+export function slaStateLabel(state: SlaState): string {
+  return SLA_STATE_LABELS[state] ?? state;
+}
+
+/** Minutos → "2h 30min" ou "45 min". */
+export function formatMinutes(min: number | null | undefined): string {
+  if (min == null || Number.isNaN(min)) return "—";
+  const n = Math.round(min);
+  if (n < 60) return `${n} min`;
+  const h = Math.floor(n / 60);
+  const m = n % 60;
+  return m > 0 ? `${h}h ${m}min` : `${h}h`;
 }

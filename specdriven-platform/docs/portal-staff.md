@@ -5,6 +5,17 @@ App: `apps/web-staff` (Vite/React, porta **5174**).
 **Como usar no dia a dia:** [guia-de-uso.md](guia-de-uso.md) (seção Portal consultoria).  
 Aprovações: [aprovacoes.md](aprovacoes.md).
 
+## Hierarquia de usuários
+
+| Nível | Papel | Portal | Home após login |
+|-------|-------|--------|-----------------|
+| Operador SpecDriven | `master` | Console plataforma + contexto consultoria | `/master` |
+| Consultoria | `admin` (Master Consultoria) | Operação + `/settings` | `/` (Overview) |
+| Operação | `gestor` / `consultor` | Fila, clientes, relatórios | `/` |
+| Cliente final | `cliente` | Portal cliente (`web-client`) | — |
+
+Master Plataforma **não** vê fila operacional até entrar numa consultoria (botão **Entrar** em `/master`). Dentro da consultoria, banner **Atuando em: {nome}** + **Sair para console**.
+
 ## Escopo
 
 - Login staff (`gestor` / `consultor`) — role `cliente` bloqueada
@@ -25,10 +36,12 @@ Aprovações: [aprovacoes.md](aprovacoes.md).
 
 ## Seeds
 
-| Role | Email | Senha |
-|------|-------|-------|
-| gestor | `gestor@specdriven.local` | `changeme` |
-| consultor | `consultor@specdriven.local` | `changeme` |
+| Role | Email | Senha | Notas |
+|------|-------|-------|-------|
+| master | `master@blendit.local` | `changeme` | Console plataforma |
+| admin | `admin@specdriven.local` | `changeme` | Master Consultoria |
+| gestor | `gestor@specdriven.local` | `changeme` | Operação |
+| consultor | `consultor@specdriven.local` | `changeme` | Operação |
 
 ## Como rodar
 

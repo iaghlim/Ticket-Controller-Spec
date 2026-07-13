@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireAuth, type AuthUser } from "./auth.js";
 import { writeAudit } from "./audit.js";
 import { isDbUnavailableError, prisma } from "./db.js";
-import { isGestor, isStaff } from "./permissions.js";
+import { canManageSettings, isStaff } from "./permissions.js";
 
 const PatchClientBillingSchema = z.object({
   baselineHoursMonth: z.number().nonnegative().nullable().optional(),
@@ -26,7 +26,7 @@ export async function patchClientBillingHandler(
 ) {
   const user = await requireAuth(request, reply);
   if (!user) return;
-  if (!isGestor(user)) {
+  if (!canManageSettings(user)) {
     return reply.status(403).send({ error: "forbidden_role" });
   }
   const { id } = request.params as { id: string };
@@ -80,7 +80,7 @@ export async function patchUserBillingHandler(
 ) {
   const user = await requireAuth(request, reply);
   if (!user) return;
-  if (!isGestor(user)) {
+  if (!canManageSettings(user)) {
     return reply.status(403).send({ error: "forbidden_role" });
   }
   const { id } = request.params as { id: string };

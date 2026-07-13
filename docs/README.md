@@ -4,9 +4,18 @@
 
 ## Manual de instalação
 
-| Doc | Para quem | Conteúdo |
-|-----|-----------|----------|
-| **[Guia de instalação](guia-instalacao.md)** | Qualquer pessoa com nível técnico básico | Passo a passo completo: instalar ferramentas, Docker, dependências e subir a plataforma |
+| Doc | Conteúdo |
+|-----|----------|
+| **[Guia de instalação](guia-instalacao.md)** | Setup local passo a passo |
+| **[Configurações da consultoria](settings.md)** | Hub `/settings` |
+| **[Checklist go-live](go-live-checklist.md)** | Deploy P0–P2 |
+| **[Segurança](security.md)** | Auth, secrets, JWT |
+
+## Funcional — plataforma cloud
+
+| Doc | Conteúdo |
+|-----|----------|
+| **[Configurações da consultoria](settings.md)** | Hub `/settings` (sprints 1–4): perfil, catálogo, SLA, e-mail, notificações, portal cliente |
 
 ## Documentação por projeto
 

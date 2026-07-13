@@ -10,6 +10,7 @@ Complementa (não substitui) a documentação do app desktop local em SpecDriven
 |-----|----------|
 | **[Guia de instalação](../../docs/guia-instalacao.md)** | Instalação completa: Docker, dependências, banco, API e portais |
 | **[Guia de uso](guia-de-uso.md)** | Como usar portais, aprovações e sync desktop |
+| **[Configurações da consultoria](../../docs/settings.md)** | Hub `/settings` — perfil, catálogo, SLA, comunicação |
 
 ## Índice técnico
 

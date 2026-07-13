@@ -1,8 +1,18 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { NavLink, Navigate, Outlet, useLocation } from "react-router-dom";
+import {
+  ApiError,
+  isStaffRole,
+  listNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+  type NotificationRow,
+} from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { NOT_CONFIGURED } from "../lib/labels";
+import { formatDate } from "../lib/labels";
 import { useClientContext } from "../lib/useClientContext";
+import { usePortalSettings } from "../lib/usePortalSettings";
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -45,7 +55,7 @@ function IconClose() {
 }
 
 export function RequireAuth() {
-  const { user, loading } = useAuth();
+  const { user, loading, logout } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -62,12 +72,181 @@ export function RequireAuth() {
     );
   }
 
+  if (isStaffRole(user.role)) {
+    return (
+      <div className="login-wrap">
+        <div className="panel login-panel">
+          <h1 style={{ marginTop: 0, fontSize: "1.25rem" }}>Acesso restrito</h1>
+          <p className="error">Use o portal de consultoria.</p>
+          <p className="muted">
+            Sua conta ({user.email}) tem perfil de equipe interna e não pode
+            acessar o portal do cliente.
+          </p>
+          <button type="button" className="btn btn-block" onClick={logout}>
+            Sair
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return <Outlet />;
+}
+
+function ClientNotifications() {
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState<NotificationRow[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await listNotifications({ limit: 30 });
+      setItems(res.notifications);
+      setUnreadCount(res.unreadCount);
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : "Não foi possível carregar notificações.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDocClick(e: MouseEvent) {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [open]);
+
+  async function onOpen() {
+    const next = !open;
+    setOpen(next);
+    if (next) await load();
+  }
+
+  async function onRead(n: NotificationRow) {
+    if (!n.readAt) {
+      try {
+        await markNotificationRead(n.id);
+        setItems((prev) =>
+          prev.map((x) =>
+            x.id === n.id ? { ...x, readAt: new Date().toISOString() } : x,
+          ),
+        );
+        setUnreadCount((c) => Math.max(0, c - 1));
+      } catch {
+        // Non-blocking.
+      }
+    }
+    if (n.href) {
+      setOpen(false);
+      if (n.href.startsWith("http")) {
+        window.open(n.href, "_blank", "noopener,noreferrer");
+      } else {
+        window.location.assign(n.href);
+      }
+    }
+  }
+
+  async function onReadAll() {
+    try {
+      await markAllNotificationsRead();
+      setItems((prev) =>
+        prev.map((x) => ({
+          ...x,
+          readAt: x.readAt ?? new Date().toISOString(),
+        })),
+      );
+      setUnreadCount(0);
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : "Falha ao marcar como lidas.",
+      );
+    }
+  }
+
+  return (
+    <div className="client-notifications" ref={wrapRef}>
+      <button
+        type="button"
+        className="icon-btn"
+        aria-label="Notificações"
+        aria-expanded={open}
+        onClick={() => void onOpen()}
+      >
+        <IconBell />
+        {unreadCount > 0 ? <span className="icon-btn-dot" aria-hidden /> : null}
+      </button>
+      {open ? (
+        <div className="client-notifications-dropdown" role="menu">
+          <div className="client-notifications-head">
+            <strong>Notificações</strong>
+            {unreadCount > 0 ? (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => void onReadAll()}
+              >
+                Marcar todas
+              </button>
+            ) : null}
+          </div>
+          {loading ? (
+            <p className="muted client-notifications-hint">Carregando…</p>
+          ) : null}
+          {error ? (
+            <p className="error client-notifications-hint">{error}</p>
+          ) : null}
+          {!loading && !error && items.length === 0 ? (
+            <p className="muted client-notifications-hint">
+              Nenhuma notificação.
+            </p>
+          ) : null}
+          {!loading && items.length > 0 ? (
+            <ul className="client-notifications-list">
+              {items.map((n) => (
+                <li key={n.id}>
+                  <button
+                    type="button"
+                    className={`client-notifications-item${n.readAt ? "" : " unread"}`}
+                    onClick={() => void onRead(n)}
+                  >
+                    <span className="client-notifications-title">{n.title}</span>
+                    {n.body ? (
+                      <span className="client-notifications-body">{n.body}</span>
+                    ) : null}
+                    <span className="client-notifications-meta">
+                      {formatDate(n.createdAt)}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export function AppLayout() {
   const { user, logout } = useAuth();
   const { clientName } = useClientContext();
+  const { settings: portalSettings } = usePortalSettings();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -76,15 +255,28 @@ export function AppLayout() {
   }, [location.pathname]);
 
   const displayName = clientName || user?.name || user?.email || "Cliente";
+  const kbUrl =
+    portalSettings?.knowledgeBaseEnabled && portalSettings.knowledgeBaseUrl
+      ? portalSettings.knowledgeBaseUrl
+      : null;
 
   return (
     <div className="client-layout">
       <header className="client-header">
         <div className="client-header-inner">
           <div className="client-brand">
-            <div className="client-brand-mark">
-              <IconCommand />
-            </div>
+            {portalSettings?.logoUrl ? (
+              <img
+                src={portalSettings.logoUrl}
+                alt={portalSettings.organizationName}
+                className="client-brand-logo"
+                style={{ maxHeight: 40, maxWidth: 140, objectFit: "contain" }}
+              />
+            ) : (
+              <div className="client-brand-mark">
+                <IconCommand />
+              </div>
+            )}
             <div>
               <p className="client-brand-title">
                 Spec<span>Driven</span>
@@ -120,10 +312,21 @@ export function AppLayout() {
             >
               Meus chamados
             </NavLink>
-            <span className="client-nav-link client-nav-unconfigured">
-              Base de conhecimento
-              <small className="unconfigured-label">{NOT_CONFIGURED}</small>
-            </span>
+            {kbUrl ? (
+              <a
+                href={kbUrl}
+                className="client-nav-link"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Base de conhecimento
+              </a>
+            ) : (
+              <span className="client-nav-link client-nav-unconfigured">
+                Base de conhecimento
+                <small className="unconfigured-label">{NOT_CONFIGURED}</small>
+              </span>
+            )}
             <button
               type="button"
               className="client-nav-link client-nav-logout"
@@ -134,10 +337,7 @@ export function AppLayout() {
           </nav>
 
           <div className="client-header-actions">
-            <span className="client-notifications-slot" aria-label="Notificações">
-              <IconBell />
-              <span className="unconfigured-label">{NOT_CONFIGURED}</span>
-            </span>
+            <ClientNotifications />
             <div className="client-user">
               <div className="client-user-avatar">{initials(displayName)}</div>
               <span className="client-user-name">{displayName}</span>
@@ -154,6 +354,22 @@ export function AppLayout() {
           <Outlet />
         </div>
       </main>
+
+      {portalSettings?.supportEmail || portalSettings?.supportPolicyText ? (
+        <footer className="client-support-footer">
+          {portalSettings.supportEmail ? (
+            <p>
+              Dúvidas?{" "}
+              <a href={`mailto:${portalSettings.supportEmail}`}>
+                {portalSettings.supportEmail}
+              </a>
+            </p>
+          ) : null}
+          {portalSettings.supportPolicyText ? (
+            <p className="client-support-policy">{portalSettings.supportPolicyText}</p>
+          ) : null}
+        </footer>
+      ) : null}
     </div>
   );
 }

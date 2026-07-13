@@ -193,8 +193,8 @@ export function ClientsPage() {
       <div className="panel">
         <h2 style={{ marginTop: 0, fontSize: "1.1rem" }}>Convidar usuário</h2>
         <p className="muted" style={{ marginTop: 0, fontSize: "0.85rem" }}>
-          E-mail via stub <code className="mono">MAIL_PROVIDER=log</code>. Aceite:{" "}
-          <code className="mono">POST /invites/accept</code>.
+          E-mail via stub <code className="mono">MAIL_PROVIDER=log</code>. Aceite em{" "}
+          <code className="mono">/accept-invite?token=…</code> (link no e-mail).
         </p>
         <form className="form" onSubmit={onInvite}>
           <div className="field">

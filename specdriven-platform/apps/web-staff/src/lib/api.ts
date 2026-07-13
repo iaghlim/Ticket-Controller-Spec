@@ -14,6 +14,8 @@ import type {
   TimeEntry,
   User,
   UserRole,
+  NotificationPrefs,
+  StaffSettings,
 } from "@specdriven/shared";
 
 export const apiBaseUrl =
@@ -29,6 +31,9 @@ export type AuthUser = {
   organizationId: string;
   organizationName: string;
   clientId: string | null;
+  homeOrganizationId?: string;
+  isPlatformContext?: boolean;
+  actingOrganizationId?: string;
 };
 
 export type LoginResponse = {
@@ -178,8 +183,38 @@ export function login(email: string, password: string) {
   });
 }
 
+export function forgotPassword(email: string) {
+  return request<{ ok: boolean; message: string }>("/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+    token: null,
+  });
+}
+
+export function resetPassword(token: string, password: string) {
+  return request<{ ok: boolean; message: string }>("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, password }),
+    token: null,
+  });
+}
+
 export function me(token?: string) {
   return request<{ user: AuthUser }>("/auth/me", { token });
+}
+
+export function switchOrg(organizationId: string) {
+  return request<LoginResponse>("/auth/switch-org", {
+    method: "POST",
+    body: JSON.stringify({ organizationId }),
+  });
+}
+
+export function exitOrg() {
+  return request<LoginResponse>("/auth/exit-org", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
 }
 
 export function listTickets() {
@@ -320,6 +355,27 @@ export function createInvite(input: CreateInviteInput) {
   return request<{ invite: Invite; mail?: unknown }>("/invites", {
     method: "POST",
     body: JSON.stringify(input),
+  });
+}
+
+export type AcceptInviteInput = {
+  token: string;
+  name: string;
+  password: string;
+};
+
+export type AcceptInviteResponse = {
+  user: Pick<User, "id" | "email" | "name" | "role" | "clientId"> & {
+    organizationId: string;
+  };
+  message: string;
+};
+
+export function acceptInvite(input: AcceptInviteInput) {
+  return request<AcceptInviteResponse>("/invites/accept", {
+    method: "POST",
+    body: JSON.stringify(input),
+    token: null,
   });
 }
 
@@ -535,4 +591,388 @@ export function search(q: string, opts?: { limit?: number }) {
   return request<{ q: string; tickets: SearchTicketHit[] }>(
     `/search?${params.toString()}`,
   );
+}
+
+export type Notification = {
+  id: string;
+  organizationId: string;
+  userId: string;
+  title: string;
+  body: string | null;
+  href: string | null;
+  readAt: string | Date | null;
+  createdAt: string | Date;
+};
+
+export function listNotifications(opts?: {
+  unreadOnly?: boolean;
+  limit?: number;
+}) {
+  const params = new URLSearchParams();
+  if (opts?.unreadOnly) params.set("unreadOnly", "true");
+  if (opts?.limit != null) params.set("limit", String(opts.limit));
+  const q = params.toString();
+  return request<{ notifications: Notification[]; unreadCount: number }>(
+    `/notifications${q ? `?${q}` : ""}`,
+  );
+}
+
+export function markNotificationRead(id: string) {
+  return request<{ notification: Notification }>(
+    `/notifications/${encodeURIComponent(id)}/read`,
+    { method: "POST" },
+  );
+}
+
+export function markAllNotificationsRead() {
+  return request<{ updated: number }>("/notifications/read-all", {
+    method: "POST",
+  });
+}
+
+export type BillingSummary = {
+  client: {
+    id: string;
+    name: string;
+    baselineHoursMonth: number | null;
+    hourlyRateCents: number | null;
+  };
+  range: { from: string; to: string };
+  hoursUsed: number;
+  baselineRemaining: number | null;
+  costCentsInternal: number;
+  byUser: {
+    userId: string;
+    name: string;
+    seconds: number;
+    costCents: number;
+  }[];
+  entryCount: number;
+};
+
+export function getBillingSummary(clientId: string, from: Date, to: Date) {
+  const params = new URLSearchParams({
+    clientId,
+    from: from.toISOString(),
+    to: to.toISOString(),
+  });
+  return request<BillingSummary>(`/billing/summary?${params.toString()}`);
+}
+
+export function patchClientBilling(
+  id: string,
+  input: {
+    baselineHoursMonth?: number | null;
+    hourlyRateCents?: number | null;
+  },
+) {
+  return request<{ client: Client }>(
+    `/clients/${encodeURIComponent(id)}/billing`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function patchUserBilling(id: string, hourRateFactor: number) {
+  return request<{ user: User }>(`/users/${encodeURIComponent(id)}/billing`, {
+    method: "PATCH",
+    body: JSON.stringify({ hourRateFactor }),
+  });
+}
+
+export function listSlaPolicies(clientId?: string) {
+  const q = clientId ? `?clientId=${encodeURIComponent(clientId)}` : "";
+  return request<{ policies: SlaPolicy[] }>(`/sla-policies${q}`);
+}
+
+export function createSlaPolicy(input: {
+  clientId: string;
+  name?: string;
+  priorityMatch?: string;
+  responseMinutes: number;
+  resolutionMinutes: number;
+  businessHourStart?: number;
+  businessHourEnd?: number;
+  weekdays?: string;
+}) {
+  return request<{ policy: SlaPolicy }>("/sla-policies", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function patchSlaPolicy(
+  id: string,
+  input: {
+    name?: string;
+    responseMinutes?: number;
+    resolutionMinutes?: number;
+    businessHourStart?: number;
+    businessHourEnd?: number;
+    weekdays?: string;
+  },
+) {
+  return request<{ policy: SlaPolicy }>(
+    `/sla-policies/${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function deleteSlaPolicy(id: string) {
+  return request<void>(`/sla-policies/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+
+export function createTag(input: {
+  name: string;
+  color?: string | null;
+  visibleToClient?: boolean;
+}) {
+  return request<{ tag: Tag }>("/tags", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function patchTag(
+  id: string,
+  input: { name?: string; color?: string | null; visibleToClient?: boolean },
+) {
+  return request<{ tag: Tag }>(`/tags/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteTag(id: string) {
+  return request<void>(`/tags/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+
+export type StaffSettingsResponse = StaffSettings;
+
+export type OrganizationHolidayItem = {
+  id: string;
+  organizationId: string;
+  date: string | Date;
+  name: string | null;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+};
+
+export type TicketModuleCatalogItem = {
+  id: string;
+  organizationId: string;
+  key: string;
+  label: string;
+  sortOrder: number;
+  enabled: boolean;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+};
+
+export function getSettings() {
+  return request<StaffSettingsResponse>("/settings");
+}
+
+export function patchOrganizationSettings(input: {
+  name?: string;
+  supportEmail?: string | null;
+  supportPolicyText?: string | null;
+}) {
+  return request<StaffSettingsResponse>("/settings/organization", {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function patchPortalSettings(input: { enabledTicketTypes: TicketType[] }) {
+  return request<StaffSettingsResponse>("/settings/portal", {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function patchPortalKbSettings(input: {
+  knowledgeBaseEnabled?: boolean;
+  knowledgeBaseUrl?: string | null;
+  portalHeroTitle?: string | null;
+  portalHeroSubtitle?: string | null;
+}) {
+  return request<StaffSettingsResponse>("/settings/portal", {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function patchEmailSettings(input: {
+  fromName?: string | null;
+  replyTo?: string | null;
+  footerText?: string | null;
+  smtpEnabled?: boolean;
+  smtpHost?: string | null;
+  smtpPort?: number | null;
+  smtpUser?: string | null;
+  smtpPass?: string | null;
+  smtpFrom?: string | null;
+}) {
+  return request<StaffSettingsResponse>("/settings/email", {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function patchNotificationSettings(input: {
+  notificationPrefs: NotificationPrefs;
+}) {
+  return request<StaffSettingsResponse>("/settings/notifications", {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function postEmailTest() {
+  return request<{ mail: { delivered: boolean; provider: string } }>(
+    "/settings/email/test",
+    { method: "POST" },
+  );
+}
+
+export function listModules() {
+  return request<{ modules: TicketModuleCatalogItem[]; canEdit: boolean }>(
+    "/settings/modules",
+  );
+}
+
+export function createModule(input: {
+  key: string;
+  label: string;
+  sortOrder?: number;
+  enabled?: boolean;
+}) {
+  return request<{ module: TicketModuleCatalogItem }>("/settings/modules", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function patchModule(
+  id: string,
+  input: { label?: string; sortOrder?: number; enabled?: boolean },
+) {
+  return request<{ module: TicketModuleCatalogItem }>(
+    `/settings/modules/${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function deleteModule(id: string) {
+  return request<void>(`/settings/modules/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+
+export function patchSlaSettings(input: {
+  slaTargetPct?: number;
+  defaultBusinessHours?: {
+    businessHourStart: number;
+    businessHourEnd: number;
+    weekdays: string;
+  } | null;
+}) {
+  return request<StaffSettingsResponse>("/settings/sla", {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function postRecalculateOpenSla() {
+  return request<{ ok: boolean; updated: number }>(
+    "/settings/sla/recalculate-open",
+    { method: "POST" },
+  );
+}
+
+export function listHolidays() {
+  return request<{ holidays: OrganizationHolidayItem[]; canEdit: boolean }>(
+    "/settings/holidays",
+  );
+}
+
+export function createHoliday(input: { date: string; name?: string | null }) {
+  return request<{ holiday: OrganizationHolidayItem }>("/settings/holidays", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteHoliday(id: string) {
+  return request<void>(`/settings/holidays/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+
+export type AuditEvent = {
+  id: string;
+  organizationId: string;
+  actorId: string | null;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  metaJson: string | null;
+  createdAt: string | Date;
+};
+
+export function listAudit(opts?: { limit?: number; entityType?: string }) {
+  const params = new URLSearchParams();
+  if (opts?.limit != null) params.set("limit", String(opts.limit));
+  if (opts?.entityType) params.set("entityType", opts.entityType);
+  const q = params.toString();
+  return request<{ events: AuditEvent[] }>(`/audit${q ? `?${q}` : ""}`);
+}
+
+export function exportPrivacyData() {
+  return request<Record<string, unknown>>("/privacy/export");
+}
+
+/** Multipart upload (field `file`) → logo da organização no portal cliente. */
+export async function uploadOrganizationLogo(
+  file: File,
+): Promise<{ ok: boolean; logoUrl: string | null }> {
+  const auth = getStoredToken();
+  const form = new FormData();
+  form.append("file", file, file.name);
+  const res = await fetch(`${apiBaseUrl}/settings/organization/logo`, {
+    method: "POST",
+    headers: auth ? { Authorization: `Bearer ${auth}` } : {},
+    body: form,
+  });
+  let body: unknown = null;
+  const text = await res.text();
+  if (text) {
+    try {
+      body = JSON.parse(text) as unknown;
+    } catch {
+      body = text;
+    }
+  }
+  if (!res.ok) {
+    const errObj = body as { error?: string; message?: string } | null;
+    throw new ApiError(
+      res.status,
+      body,
+      errObj?.message ?? errObj?.error ?? `HTTP ${res.status}`,
+    );
+  }
+  return body as { ok: boolean; logoUrl: string | null };
 }

@@ -38,7 +38,7 @@ export async function listAuditHandler(
 ) {
   const user = await requireAuth(request, reply);
   if (!user) return;
-  if (user.role !== "gestor") {
+  if (!["gestor", "admin", "master"].includes(user.role)) {
     return reply.status(403).send({ error: "forbidden_role" });
   }
 

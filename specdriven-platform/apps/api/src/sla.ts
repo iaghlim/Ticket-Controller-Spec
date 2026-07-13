@@ -4,7 +4,11 @@ import { TicketKeySchema } from "@specdriven/shared";
 import type { TicketStatus } from "@specdriven/shared";
 import { requireAuth, type AuthUser } from "./auth.js";
 import { isDbUnavailableError, prisma } from "./db.js";
-import { isGestor, isStaff } from "./permissions.js";
+import { canManageSettings, isStaff } from "./permissions.js";
+import {
+  getOrgBusinessHoursTemplate,
+  getOrgHolidayDateKeys,
+} from "./settings.js";
 import {
   addBusinessMinutes,
   businessHoursFromPolicy,
@@ -104,9 +108,12 @@ export async function computeSlaDueAt(opts: {
   priority: string | null | undefined;
   from: Date;
 }): Promise<Date | null> {
-  const policy = await findSlaPolicyForTicket(opts);
+  const [policy, holidays] = await Promise.all([
+    findSlaPolicyForTicket(opts),
+    getOrgHolidayDateKeys(opts.organizationId),
+  ]);
   if (!policy) return null;
-  const cfg = businessHoursFromPolicy(policy);
+  const cfg = businessHoursFromPolicy(policy, holidays);
   return addBusinessMinutes(opts.from, policy.resolutionMinutes, cfg);
 }
 
@@ -159,8 +166,8 @@ export async function createSlaPolicyHandler(
 ) {
   const user = await requireAuth(request, reply);
   if (!user) return;
-  if (!isGestor(user)) {
-    return reply.status(403).send({ error: "forbidden_gestor_only" });
+  if (!canManageSettings(user)) {
+    return reply.status(403).send({ error: "forbidden_role" });
   }
   if (!requireDbOrg(user, reply)) return;
 
@@ -183,6 +190,8 @@ export async function createSlaPolicyHandler(
       return reply.status(404).send({ error: "client_not_found" });
     }
 
+    const template = await getOrgBusinessHoursTemplate(user.organizationId);
+
     const policy = await prisma.slaPolicy.create({
       data: {
         organizationId: user.organizationId,
@@ -191,9 +200,11 @@ export async function createSlaPolicyHandler(
         priorityMatch: (parsed.data.priorityMatch ?? "").trim(),
         responseMinutes: parsed.data.responseMinutes,
         resolutionMinutes: parsed.data.resolutionMinutes,
-        businessHourStart: parsed.data.businessHourStart ?? 9,
-        businessHourEnd: parsed.data.businessHourEnd ?? 18,
-        weekdays: parsed.data.weekdays ?? "1,2,3,4,5",
+        businessHourStart:
+          parsed.data.businessHourStart ?? template.businessHourStart,
+        businessHourEnd:
+          parsed.data.businessHourEnd ?? template.businessHourEnd,
+        weekdays: parsed.data.weekdays ?? template.weekdays,
       },
     });
     return reply.status(201).send({ policy });
@@ -213,8 +224,8 @@ export async function patchSlaPolicyHandler(
 ) {
   const user = await requireAuth(request, reply);
   if (!user) return;
-  if (!isGestor(user)) {
-    return reply.status(403).send({ error: "forbidden_gestor_only" });
+  if (!canManageSettings(user)) {
+    return reply.status(403).send({ error: "forbidden_role" });
   }
   if (!requireDbOrg(user, reply)) return;
 
@@ -283,8 +294,8 @@ export async function deleteSlaPolicyHandler(
 ) {
   const user = await requireAuth(request, reply);
   if (!user) return;
-  if (!isGestor(user)) {
-    return reply.status(403).send({ error: "forbidden_gestor_only" });
+  if (!canManageSettings(user)) {
+    return reply.status(403).send({ error: "forbidden_role" });
   }
   if (!requireDbOrg(user, reply)) return;
 
@@ -335,11 +346,14 @@ export async function getTicketSlaHandler(
       return reply.status(404).send({ error: "not_found" });
     }
 
-    const policy = await findSlaPolicyForTicket({
-      organizationId: ticket.organizationId,
-      clientId: ticket.clientId,
-      priority: ticket.priority,
-    });
+    const [policy, holidays] = await Promise.all([
+      findSlaPolicyForTicket({
+        organizationId: ticket.organizationId,
+        clientId: ticket.clientId,
+        priority: ticket.priority,
+      }),
+      getOrgHolidayDateKeys(ticket.organizationId),
+    ]);
 
     if (!policy) {
       return {
@@ -354,7 +368,7 @@ export async function getTicketSlaHandler(
       };
     }
 
-    const cfg = businessHoursFromPolicy(policy);
+    const cfg = businessHoursFromPolicy(policy, holidays);
     const now = new Date();
     const dueAt =
       ticket.slaDueAt ??
@@ -405,3 +419,52 @@ export async function getTicketSlaHandler(
 }
 
 export { isStaff };
+
+export async function recalculateOpenSlaHandler(
+  request: FastifyRequest,
+  reply: FastifyReply,
+) {
+  const user = await requireAuth(request, reply);
+  if (!user) return;
+  if (!canManageSettings(user)) {
+    return reply.status(403).send({ error: "forbidden_role" });
+  }
+  if (!requireDbOrg(user, reply)) return;
+
+  try {
+    const open = await prisma.ticket.findMany({
+      where: {
+        organizationId: user.organizationId,
+        deletedAt: null,
+        status: { notIn: ["concluido", "cancelado"] },
+      },
+      select: {
+        id: true,
+        clientId: true,
+        priority: true,
+        createdAt: true,
+      },
+      take: 500,
+    });
+
+    let updated = 0;
+    for (const t of open) {
+      const slaDueAt = await computeSlaDueAt({
+        organizationId: user.organizationId,
+        clientId: t.clientId,
+        priority: t.priority,
+        from: t.createdAt,
+      });
+      await prisma.ticket.update({
+        where: { id: t.id },
+        data: { slaDueAt },
+      });
+      updated += 1;
+    }
+
+    return { ok: true, updated };
+  } catch (err) {
+    if (isDbUnavailableError(err)) return dbUnavailable(reply);
+    throw err;
+  }
+}

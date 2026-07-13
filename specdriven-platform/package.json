@@ -16,10 +16,17 @@
     "dev:web-staff": "npm run dev -w @specdriven/web-staff",
     "db:generate": "npm run db:generate -w @specdriven/api",
     "db:push": "npm run db:push -w @specdriven/api",
+    "db:migrate:deploy": "npm run db:migrate:deploy -w @specdriven/api",
     "db:seed": "npm run db:seed -w @specdriven/api",
-    "typecheck": "npm run typecheck -w @specdriven/shared && npm run typecheck -w @specdriven/api && npm run typecheck -w @specdriven/web-client && npm run typecheck -w @specdriven/web-staff"
+    "db:bootstrap": "npm run db:bootstrap -w @specdriven/api",
+    "typecheck": "npm run typecheck -w @specdriven/shared && npm run typecheck -w @specdriven/api && npm run typecheck -w @specdriven/web-client && npm run typecheck -w @specdriven/web-staff",
+    "test": "npm run test -w @specdriven/api",
+    "test:e2e": "playwright test"
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.51.0"
   }
 }

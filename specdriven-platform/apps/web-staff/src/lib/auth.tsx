@@ -9,11 +9,13 @@ import {
 } from "react";
 import {
   ApiError,
+  exitOrg as apiExitOrg,
   getStoredToken,
   isStaffRole,
   login as apiLogin,
   me,
   setStoredToken,
+  switchOrg as apiSwitchOrg,
   type AuthUser,
 } from "./api";
 
@@ -21,8 +23,11 @@ type AuthState = {
   user: AuthUser | null;
   token: string | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<AuthUser>;
   logout: () => void;
+  refreshUser: () => Promise<void>;
+  switchOrg: (organizationId: string) => Promise<void>;
+  exitOrg: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -89,6 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStoredToken(res.token);
     setToken(res.token);
     setUser(res.user);
+    return res.user;
   }, []);
 
   const logout = useCallback(() => {
@@ -97,9 +103,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    const stored = getStoredToken();
+    if (!stored) return;
+    const { user: u } = await me(stored);
+    assertStaff(u);
+    setUser(u);
+  }, []);
+
+  const switchOrg = useCallback(async (organizationId: string) => {
+    const res = await apiSwitchOrg(organizationId);
+    assertStaff(res.user);
+    setStoredToken(res.token);
+    setToken(res.token);
+    setUser(res.user);
+  }, []);
+
+  const exitOrg = useCallback(async () => {
+    const res = await apiExitOrg();
+    assertStaff(res.user);
+    setStoredToken(res.token);
+    setToken(res.token);
+    setUser(res.user);
+  }, []);
+
   const value = useMemo(
-    () => ({ user, token, loading, login, logout }),
-    [user, token, loading, login, logout],
+    () => ({
+      user,
+      token,
+      loading,
+      login,
+      logout,
+      refreshUser,
+      switchOrg,
+      exitOrg,
+    }),
+    [user, token, loading, login, logout, refreshUser, switchOrg, exitOrg],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

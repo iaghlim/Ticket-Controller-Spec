@@ -2,12 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   TICKET_TYPES,
+  computePeriodSlaPct,
+  currentMonthRange,
   operationsCenterLabel,
   type Ticket,
   type TicketType,
 } from "@specdriven/shared";
 import { ApiError, listTickets } from "../lib/api";
 import { useClientContext } from "../lib/useClientContext";
+import { usePortalSettings } from "../lib/usePortalSettings";
 import {
   formatDate,
   NOT_CONFIGURED,
@@ -48,6 +51,7 @@ function isOpen(t: Ticket): boolean {
 
 export function ClientHomePage() {
   const { clientName, organizationName } = useClientContext();
+  const { settings: portalSettings, loading: portalLoading } = usePortalSettings();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -98,6 +102,26 @@ export function ClientHomePage() {
     return formatDate(latest.updatedAt);
   }, [tickets]);
 
+  const slaMonth = useMemo(() => {
+    const { from, to } = currentMonthRange();
+    const pct = computePeriodSlaPct(tickets, from, to);
+    if (pct == null) return null;
+    const target = portalSettings?.slaTargetPct ?? 90;
+    return { pct, target };
+  }, [tickets, portalSettings?.slaTargetPct]);
+
+  const kbUrl =
+    portalSettings?.knowledgeBaseEnabled && portalSettings.knowledgeBaseUrl
+      ? portalSettings.knowledgeBaseUrl
+      : null;
+
+  const enabledTypes = useMemo(() => {
+    if (portalSettings?.enabledTicketTypes?.length) {
+      return portalSettings.enabledTicketTypes;
+    }
+    return [...TICKET_TYPES];
+  }, [portalSettings]);
+
   return (
     <>
       <section className="hero-banner">
@@ -106,9 +130,12 @@ export function ClientHomePage() {
         <p className="hero-eyebrow">Ambiente seguro · {clientName}</p>
         <div className="hero-body">
           <div>
-            <h1 className="hero-title">Como podemos ajudar?</h1>
+            <h1 className="hero-title">
+              {portalSettings?.portalHeroTitle?.trim() || "Como podemos ajudar?"}
+            </h1>
             <p className="hero-lead">
-              Abra um chamado ou acompanhe os serviços da sua empresa.
+              {portalSettings?.portalHeroSubtitle?.trim() ||
+                "Abra um chamado ou acompanhe os serviços da sua empresa."}
             </p>
             <p className="hero-meta muted">
               {operationsCenterLabel(organizationName)}
@@ -207,7 +234,13 @@ export function ClientHomePage() {
             </div>
             <div className="tracking-row">
               <span>SLA do mês</span>
-              <strong className="unconfigured-label">{NOT_CONFIGURED}</strong>
+              <strong className="mono">
+                {loading
+                  ? "…"
+                  : slaMonth
+                    ? `${slaMonth.pct}% — meta ${slaMonth.target}%`
+                    : NOT_CONFIGURED}
+              </strong>
             </div>
             <div className="tracking-row">
               <span>Última atualização</span>
@@ -216,8 +249,28 @@ export function ClientHomePage() {
           </div>
           <div className="tracking-kb">
             <span>Consultar base de conhecimento</span>
-            <span className="unconfigured-label">{NOT_CONFIGURED}</span>
+            {kbUrl ? (
+              <a
+                href={kbUrl}
+                className="section-link"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Abrir ↗
+              </a>
+            ) : (
+              <span className="unconfigured-label">{NOT_CONFIGURED}</span>
+            )}
           </div>
+          {portalSettings?.businessHoursSummary ? (
+            <p
+              className="muted"
+              style={{ fontSize: "0.85rem", marginTop: "0.75rem" }}
+              title={portalSettings.businessHoursSummary}
+            >
+              {portalSettings.businessHoursSummary}
+            </p>
+          ) : null}
         </aside>
       </div>
 
@@ -232,7 +285,7 @@ export function ClientHomePage() {
           </div>
         </div>
         <div className="category-grid">
-          {TICKET_TYPES.map((type) => {
+          {(portalLoading ? TICKET_TYPES : enabledTypes).map((type) => {
             const meta = CATEGORY_META[type];
             return (
               <Link

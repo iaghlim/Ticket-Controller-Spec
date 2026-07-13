@@ -9,7 +9,9 @@ build/
 # Environment
 .env
 .env.local
-.env.*.local
+.env.*
+!.env.example
+!.env.production.example
 
 # Prisma
 apps/api/prisma/*.db

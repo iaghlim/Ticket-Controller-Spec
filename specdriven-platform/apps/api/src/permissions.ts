@@ -27,6 +27,15 @@ export function isGestor(user: AuthUser): boolean {
   return user.role === "gestor";
 }
 
+/** Edição de configurações da consultoria (perfil, SLA, catálogo, etc.). */
+export function canManageSettings(user: AuthUser): boolean {
+  return (
+    user.role === "gestor" ||
+    user.role === "admin" ||
+    user.role === "master"
+  );
+}
+
 export function canManageClients(user: AuthUser): boolean {
   return (
     user.role === "master" ||
@@ -54,10 +63,14 @@ export function canInvite(user: AuthUser, targetRole: UserRole): boolean {
   return false;
 }
 
+export function isPlatformContext(user: AuthUser): boolean {
+  return user.role === "master" && user.isPlatformContext === true;
+}
+
 export function canManageOrganizations(user: AuthUser): boolean {
-  return user.role === "master";
+  return user.role === "master" && isPlatformContext(user);
 }
 
 export function canCreateOrgUsers(user: AuthUser): boolean {
-  return user.role === "master";
+  return user.role === "master" && isPlatformContext(user);
 }

@@ -12,6 +12,21 @@ jobs:
       run:
         working-directory: .
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: specdriven
+          POSTGRES_PASSWORD: specdriven
+          POSTGRES_DB: specdriven
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U specdriven -d specdriven"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -23,8 +38,18 @@ jobs:
       - name: Install
         run: npm ci
 
+      - name: Validate Prisma migrations exist
+        run: |
+          test -d apps/api/prisma/migrations
+          test "$(find apps/api/prisma/migrations -mindepth 1 -maxdepth 1 -type d | wc -l)" -gt 0
+
       - name: Prisma generate
         run: npm run db:generate
+        env:
+          DATABASE_URL: postgresql://specdriven:specdriven@localhost:5432/specdriven?schema=public
+
+      - name: Prisma migrate deploy
+        run: npm run db:migrate:deploy
         env:
           DATABASE_URL: postgresql://specdriven:specdriven@localhost:5432/specdriven?schema=public
 

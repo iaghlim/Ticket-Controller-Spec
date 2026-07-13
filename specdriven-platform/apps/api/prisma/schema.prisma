@@ -67,8 +67,85 @@ model Organization {
   notifications    Notification[]
   auditEvents      AuditEvent[]
   projects         Project[]
+  settings         OrganizationSettings?
+  moduleCatalog    TicketModuleCatalog[]
+  holidays         OrganizationHoliday[]
 
   @@map("organizations")
+}
+
+model OrganizationSettings {
+  organizationId     String   @id
+  supportEmail       String?
+  /// Texto curto exibido no footer do portal cliente (2–3 linhas).
+  supportPolicyText  String?
+  /// Subset habilitado de TicketType (CSV).
+  enabledTicketTypes String   @default("melhoria,incidente,duvida,problema")
+  /// Meta de cumprimento SLA (%) exibida em dashboards.
+  slaTargetPct       Int      @default(90)
+  /// JSON: { businessHourStart, businessHourEnd, weekdays } — template para novas políticas.
+  defaultBusinessHoursJson String?
+  /// Nome exibido no From: dos e-mails transacionais.
+  emailFromName      String?
+  /// Reply-To dos e-mails transacionais.
+  emailReplyTo       String?
+  /// Rodapé opcional nos templates de e-mail.
+  emailFooterText    String?
+  knowledgeBaseEnabled Boolean @default(false)
+  knowledgeBaseUrl   String?
+  /// Matriz evento × canal (JSON).
+  notificationPrefsJson String @default("{}")
+  /// Chave S3 do logo (org branding).
+  logoStorageKey     String?
+  /// Título do hero no portal cliente.
+  portalHeroTitle    String?
+  /// Subtítulo do hero no portal cliente.
+  portalHeroSubtitle String?
+  /// SMTP próprio da consultoria (P2).
+  smtpEnabled        Boolean  @default(false)
+  smtpHost           String?
+  smtpPort           Int?
+  smtpUser           String?
+  smtpPass           String?
+  smtpFrom           String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("organization_settings")
+}
+
+model OrganizationHoliday {
+  id             String   @id @default(uuid())
+  organizationId String
+  date           DateTime @db.Date
+  name           String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, date])
+  @@index([organizationId])
+  @@map("organization_holidays")
+}
+
+model TicketModuleCatalog {
+  id             String   @id @default(uuid())
+  organizationId String
+  key            String
+  label          String
+  sortOrder      Int      @default(0)
+  enabled        Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, key])
+  @@index([organizationId])
+  @@map("ticket_module_catalog")
 }
 
 model Client {
@@ -303,6 +380,8 @@ model Tag {
   organizationId String
   name           String
   color          String?
+  /// Exibir no portal cliente no detalhe do chamado.
+  visibleToClient Boolean @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

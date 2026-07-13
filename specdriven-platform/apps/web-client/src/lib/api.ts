@@ -1,8 +1,10 @@
 import type {
   Attachment,
   Comment,
+  PortalSettings,
+  SlaState,
+  Tag,
   Ticket,
-  TicketModule,
   TicketType,
   UserRole,
 } from "@specdriven/shared";
@@ -94,6 +96,41 @@ export function login(email: string, password: string) {
   });
 }
 
+export function forgotPassword(email: string) {
+  return request<{ ok: boolean; message: string }>("/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+    token: null,
+  });
+}
+
+export function resetPassword(token: string, password: string) {
+  return request<{ ok: boolean; message: string }>("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, password }),
+    token: null,
+  });
+}
+
+export type AcceptInviteInput = {
+  token: string;
+  name: string;
+  password: string;
+};
+
+export type AcceptInviteResponse = {
+  user: AuthUser;
+  message: string;
+};
+
+export function acceptInvite(input: AcceptInviteInput) {
+  return request<AcceptInviteResponse>("/invites/accept", {
+    method: "POST",
+    body: JSON.stringify(input),
+    token: null,
+  });
+}
+
 export function me(token?: string) {
   return request<{ user: AuthUser }>("/auth/me", { token });
 }
@@ -119,7 +156,7 @@ export function listClients() {
 export function getPlatformMeta() {
   return request<{
     flags?: { storageConfigured?: boolean };
-    domain?: { ticketTypes?: TicketType[]; ticketModules?: TicketModule[] };
+    domain?: { ticketTypes?: TicketType[]; ticketModules?: string[] };
   }>("/_meta/routes");
 }
 
@@ -129,7 +166,7 @@ export function createTicket(input: {
   description?: string;
   ticketType?: TicketType;
   companyName?: string;
-  module?: TicketModule;
+  module?: string;
 }) {
   return request<{ ticket: Ticket }>("/tickets", {
     method: "POST",
@@ -217,4 +254,77 @@ export function getAttachmentDownload(key: string, id: string) {
 
 export function attachmentHasBinary(a: Attachment): boolean {
   return !a.storageKey.startsWith("local://");
+}
+
+export function isStaffRole(role: UserRole): boolean {
+  return (
+    role === "master" ||
+    role === "admin" ||
+    role === "gestor" ||
+    role === "consultor"
+  );
+}
+
+export type NotificationRow = {
+  id: string;
+  title: string;
+  body: string | null;
+  href: string | null;
+  readAt: string | Date | null;
+  createdAt: string | Date;
+};
+
+export type TicketSla = {
+  state: SlaState;
+  dueAt: string | Date | null;
+  policy: { id: string; name: string } | null;
+  elapsedBusinessMinutes: number | null;
+  remainingBusinessMinutes: number | null;
+  message?: string;
+  responseMinutes?: number;
+  resolutionMinutes?: number;
+  firstResponseAt?: string | Date | null;
+  resolvedAt?: string | Date | null;
+};
+
+export function listNotifications(opts?: {
+  unreadOnly?: boolean;
+  limit?: number;
+}) {
+  const params = new URLSearchParams();
+  if (opts?.unreadOnly) params.set("unreadOnly", "true");
+  if (opts?.limit != null) params.set("limit", String(opts.limit));
+  const qs = params.toString();
+  return request<{ notifications: NotificationRow[]; unreadCount: number }>(
+    `/notifications${qs ? `?${qs}` : ""}`,
+  );
+}
+
+export function markNotificationRead(id: string) {
+  return request<{ notification: NotificationRow }>(
+    `/notifications/${encodeURIComponent(id)}/read`,
+    { method: "POST" },
+  );
+}
+
+export function markAllNotificationsRead() {
+  return request<{ updated: number }>("/notifications/read-all", {
+    method: "POST",
+  });
+}
+
+export function getTicketSla(key: string) {
+  return request<{ sla: TicketSla }>(
+    `/tickets/${encodeURIComponent(key)}/sla`,
+  );
+}
+
+export function getPortalSettings() {
+  return request<PortalSettings>("/portal/settings");
+}
+
+export function listTicketTags(key: string) {
+  return request<{ tags: Tag[] }>(
+    `/tickets/${encodeURIComponent(key)}/tags`,
+  );
 }

@@ -1,0 +1,27 @@
+# syntax=docker/dockerfile:1
+# Build arg APP_DIR: web-client | web-staff
+
+FROM node:20-alpine AS build
+WORKDIR /app
+
+ARG APP_DIR=web-client
+ARG VITE_API_URL=http://localhost:3000
+ENV VITE_API_URL=${VITE_API_URL}
+
+COPY package.json package-lock.json tsconfig.base.json ./
+COPY packages/shared/package.json ./packages/shared/package.json
+COPY apps/api/package.json ./apps/api/package.json
+COPY apps/web-client/package.json ./apps/web-client/package.json
+COPY apps/web-staff/package.json ./apps/web-staff/package.json
+RUN npm ci --workspace @specdriven/shared --workspace @specdriven/${APP_DIR}
+COPY packages/shared ./packages/shared
+COPY apps/${APP_DIR} ./apps/${APP_DIR}
+RUN npm run build -w @specdriven/shared
+RUN npm run build -w @specdriven/${APP_DIR}
+
+FROM nginx:1.27-alpine AS runner
+ARG APP_DIR=web-client
+COPY docker/nginx-spa.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/apps/${APP_DIR}/dist /usr/share/nginx/html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]

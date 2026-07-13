@@ -23,7 +23,21 @@ Body: `{ "email": string, "password": string }`
 
 Header: `Authorization: Bearer <token>`
 
-Retorna o usuário autenticado ou **401**.
+Retorna o usuário autenticado ou **401**. Para `master`, inclui `homeOrganizationId`, `isPlatformContext` e `actingOrganizationId`.
+
+### `POST /auth/switch-org`
+
+Header: `Authorization: Bearer <token>` — **master** only.
+
+Body: `{ "organizationId": "<uuid>" }`
+
+Reemite JWT com `organizationId` da consultoria alvo e `isPlatformContext: false`. Usado pelo botão **Entrar** no console `/master`.
+
+### `POST /auth/exit-org`
+
+Header: `Authorization: Bearer <token>` — **master** only.
+
+Volta ao contexto plataforma (`organizationId` = org home, `isPlatformContext: true`).
 
 ### `GET /clients`
 

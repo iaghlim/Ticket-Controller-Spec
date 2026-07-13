@@ -180,6 +180,24 @@ Só o **gestor** aprova/rejeita.
 
 Abra **Relatórios** para contagens por status / assignee (visão operacional básica).
 
+### 4.7 Configurar a consultoria
+
+Hub unificado em **Configurações** (`/settings`). Documentação completa: **[Configurações da consultoria](../../docs/settings.md)**.
+
+**Quem edita:** gestor ou admin. Consultor entra em modo leitura.
+
+Passos rápidos (primeira configuração):
+
+1. Abra **Configurações** na sidebar do portal staff.
+2. Em **Perfil da organização**, defina nome exibido e e-mail de suporte.
+3. Em **Catálogo**, confira tipos ITIL habilitados e módulos/áreas do cliente.
+4. Em **SLA**, cadastre ao menos uma política; opcionalmente feriados, horário comercial padrão e meta %.
+5. Em **E-mail** e **Notificações**, ajuste identidade de envio e avisos ao cliente.
+6. Em **Portal cliente**, ative a base de conhecimento se houver URL externa.
+7. Na **Visão geral**, confira os indicadores de completude (Perfil, SLA, Catálogo, Comunicação).
+
+O portal cliente reflete nome, suporte, catálogo, meta SLA e KB via `GET /portal/settings` — sem redeploy. Baseline e políticas SLA detalhadas permanecem só no staff.
+
 ---
 
 ## 5. App desktop + modo Cloud
@@ -277,6 +295,7 @@ Se o upload falhar (MinIO/S3 ausente), o arquivo **local** já foi gerado; só a
 | Doc | Quando usar |
 |-----|-------------|
 | [portal-cliente.md](portal-cliente.md) | Escopo técnico do app cliente |
+| [Configurações da consultoria](../../docs/settings.md) | Hub `/settings` e reflexo no portal cliente |
 | [portal-staff.md](portal-staff.md) | Escopo técnico do app staff |
 | [aprovacoes.md](aprovacoes.md) | Regras de approve/reject |
 | [sync-desktop.md](sync-desktop.md) | Detalhe do pull/push e materialização |

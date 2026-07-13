@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
-import { Link, NavLink, Navigate, Outlet, useLocation } from "react-router-dom";
+import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { listApprovals, listTickets } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { NOT_CONFIGURED, roleLabel } from "../lib/labels";
+import { roleLabel } from "../lib/labels";
+import { isActingMaster, isPlatformMaster } from "../lib/session";
+import { NotificationBell } from "./NotificationBell";
 import { StaffSearch } from "./StaffSearch";
 
 function initials(name: string): string {
@@ -65,6 +67,15 @@ function IconChart() {
   );
 }
 
+function IconSettings() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+    </svg>
+  );
+}
+
 function IconMenu() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
@@ -77,15 +88,6 @@ function IconPlus() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
       <path d="M12 5v14M5 12h14" />
-    </svg>
-  );
-}
-
-function IconBell() {
-  return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-      <path d="M18 8a6 6 0 1 0-12 0c0 7-3 7-3 7h18s-3 0-3-7" />
-      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
     </svg>
   );
 }
@@ -112,18 +114,24 @@ export function RequireAuth() {
 }
 
 export function AppLayout() {
-  const { user, logout } = useAuth();
+  const { user, logout, exitOrg } = useAuth();
+  const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [ticketCount, setTicketCount] = useState<number | null>(null);
   const [myQueueCount, setMyQueueCount] = useState<number | null>(null);
   const [pendingApprovals, setPendingApprovals] = useState<number | null>(null);
+  const [exiting, setExiting] = useState(false);
+
+  const platformMode = isPlatformMaster(user);
+  const actingMaster = isActingMaster(user);
 
   useEffect(() => {
     setMenuOpen(false);
   }, [location.pathname]);
 
   useEffect(() => {
+    if (platformMode) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -147,17 +155,31 @@ export function AppLayout() {
     return () => {
       cancelled = true;
     };
-  }, [user, location.pathname]);
+  }, [user, location.pathname, platformMode]);
 
   const displayName = user?.name ?? user?.email ?? "Usuário";
   const roleText =
     user?.role === "gestor"
       ? "Gestora de operações"
       : user?.role === "master"
-        ? "Master da plataforma"
-        : user?.role
-          ? roleLabel(user.role)
-          : "";
+        ? platformMode
+          ? "Master da plataforma"
+          : "Master da plataforma (em consultoria)"
+        : user?.role === "admin"
+          ? "Master da consultoria"
+          : user?.role
+            ? roleLabel(user.role)
+            : "";
+
+  async function onExitToPlatform() {
+    setExiting(true);
+    try {
+      await exitOrg();
+      navigate("/master", { replace: true });
+    } finally {
+      setExiting(false);
+    }
+  }
 
   return (
     <div className="app-layout">
@@ -181,93 +203,11 @@ export function AppLayout() {
           </div>
         </div>
 
-        <p className="nav-section-label">Operação</p>
-        <ul className="nav-list">
-          <li>
-            <NavLink
-              to="/"
-              end
-              className={({ isActive }) =>
-                `nav-item${isActive ? " active" : ""}`
-              }
-            >
-              <IconDashboard />
-              Visão geral
-            </NavLink>
-          </li>
-          <li>
-            <NavLink
-              to="/tickets"
-              end={false}
-              className={({ isActive }) => {
-                const mine = location.search.includes("mine");
-                return `nav-item${isActive && !mine && location.pathname === "/tickets" ? " active" : ""}`;
-              }}
-            >
-              <IconTickets />
-              Chamados
-              {ticketCount != null ? (
-                <span className="nav-badge">{ticketCount}</span>
-              ) : null}
-            </NavLink>
-          </li>
-          <li>
-            <NavLink
-              to="/tickets?mine=1"
-              className={() =>
-                `nav-item${location.pathname === "/tickets" && location.search.includes("mine") ? " active" : ""}`
-              }
-            >
-              <IconQueue />
-              Minha fila
-              {myQueueCount != null ? (
-                <span className="nav-badge">{myQueueCount}</span>
-              ) : null}
-            </NavLink>
-          </li>
-          <li>
-            <NavLink
-              to="/approvals"
-              className={({ isActive }) =>
-                `nav-item${isActive ? " active" : ""}`
-              }
-            >
-              <IconClipboard />
-              Aprovação de horas
-              {pendingApprovals != null ? (
-                <span className="nav-badge">{pendingApprovals}</span>
-              ) : null}
-            </NavLink>
-          </li>
-        </ul>
-
-        <p className="nav-section-label" style={{ marginTop: "1.75rem" }}>
-          Gestão
+        <p className="nav-section-label">
+          {platformMode ? "Plataforma" : "Operação"}
         </p>
         <ul className="nav-list">
-          <li>
-            <NavLink
-              to="/clients"
-              className={({ isActive }) =>
-                `nav-item${isActive ? " active" : ""}`
-              }
-            >
-              <IconBuilding />
-              Clientes
-            </NavLink>
-          </li>
-          <li>
-            <NavLink
-              to="/reports"
-              className={({ isActive }) =>
-                `nav-item${isActive ? " active" : ""}`
-              }
-            >
-              <IconChart />
-              Relatórios
-            </NavLink>
-          </li>
-          {user?.role === "master" ? (
+          {platformMode ? (
             <li>
               <NavLink
                 to="/master"
@@ -279,14 +219,112 @@ export function AppLayout() {
                 Consultorias
               </NavLink>
             </li>
-          ) : null}
+          ) : (
+            <>
+              <li>
+                <NavLink
+                  to="/"
+                  end
+                  className={({ isActive }) =>
+                    `nav-item${isActive ? " active" : ""}`
+                  }
+                >
+                  <IconDashboard />
+                  Visão geral
+                </NavLink>
+              </li>
+              <li>
+                <NavLink
+                  to="/tickets"
+                  end={false}
+                  className={({ isActive }) => {
+                    const mine = location.search.includes("mine");
+                    return `nav-item${isActive && !mine && location.pathname === "/tickets" ? " active" : ""}`;
+                  }}
+                >
+                  <IconTickets />
+                  Chamados
+                  {ticketCount != null ? (
+                    <span className="nav-badge">{ticketCount}</span>
+                  ) : null}
+                </NavLink>
+              </li>
+              <li>
+                <NavLink
+                  to="/tickets?mine=1"
+                  className={() =>
+                    `nav-item${location.pathname === "/tickets" && location.search.includes("mine") ? " active" : ""}`
+                  }
+                >
+                  <IconQueue />
+                  Minha fila
+                  {myQueueCount != null ? (
+                    <span className="nav-badge">{myQueueCount}</span>
+                  ) : null}
+                </NavLink>
+              </li>
+              <li>
+                <NavLink
+                  to="/approvals"
+                  className={({ isActive }) =>
+                    `nav-item${isActive ? " active" : ""}`
+                  }
+                >
+                  <IconClipboard />
+                  Aprovação de horas
+                  {pendingApprovals != null ? (
+                    <span className="nav-badge">{pendingApprovals}</span>
+                  ) : null}
+                </NavLink>
+              </li>
+            </>
+          )}
         </ul>
 
+        {!platformMode ? (
+          <>
+            <p className="nav-section-label" style={{ marginTop: "1.75rem" }}>
+              Gestão
+            </p>
+            <ul className="nav-list">
+              <li>
+                <NavLink
+                  to="/clients"
+                  className={({ isActive }) =>
+                    `nav-item${isActive ? " active" : ""}`
+                  }
+                >
+                  <IconBuilding />
+                  Clientes
+                </NavLink>
+              </li>
+              <li>
+                <NavLink
+                  to="/reports"
+                  className={({ isActive }) =>
+                    `nav-item${isActive ? " active" : ""}`
+                  }
+                >
+                  <IconChart />
+                  Relatórios
+                </NavLink>
+              </li>
+            </ul>
+          </>
+        ) : null}
+
         <div className="sidebar-footer">
-          <span className="nav-item nav-item-unconfigured">
-            Configurações
-            <span className="nav-item-sub unconfigured-label">{NOT_CONFIGURED}</span>
-          </span>
+          {!platformMode ? (
+            <NavLink
+              to="/settings"
+              className={({ isActive }) =>
+                `nav-item${isActive ? " active" : ""}`
+              }
+            >
+              <IconSettings />
+              Configurações
+            </NavLink>
+          ) : null}
           <div className="sidebar-user">
             <div className="sidebar-user-avatar">{initials(displayName)}</div>
             <div className="sidebar-user-info">
@@ -306,6 +344,21 @@ export function AppLayout() {
       </aside>
 
       <div className="main-area">
+        {actingMaster ? (
+          <div className="platform-context-banner">
+            <span>
+              Atuando em: <strong>{user?.organizationName}</strong>
+            </span>
+            <button
+              type="button"
+              className="btn btn-sm btn-ghost"
+              disabled={exiting}
+              onClick={() => void onExitToPlatform()}
+            >
+              {exiting ? "Saindo…" : "Sair para console"}
+            </button>
+          </div>
+        ) : null}
         <header className="content-header">
           <button
             type="button"
@@ -315,18 +368,17 @@ export function AppLayout() {
           >
             <IconMenu />
           </button>
-          <StaffSearch />
+          {!platformMode ? <StaffSearch /> : <div className="header-spacer" />}
           <div className="header-actions">
-            <Link to="/approvals" className="icon-btn" aria-label="Notificações">
-              <IconBell />
-              {pendingApprovals != null && pendingApprovals > 0 ? (
-                <span className="icon-btn-dot" />
-              ) : null}
-            </Link>
-            <Link className="btn btn-sm" to="/tickets/new">
-              <IconPlus />
-              Novo chamado
-            </Link>
+            {!platformMode ? (
+              <>
+                <NotificationBell refreshKey={location.pathname} />
+                <Link className="btn btn-sm" to="/tickets/new">
+                  <IconPlus />
+                  Novo chamado
+                </Link>
+              </>
+            ) : null}
           </div>
         </header>
         <main className="content-body">

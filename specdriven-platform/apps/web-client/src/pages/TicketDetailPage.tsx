@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
-import type { Attachment, Comment, Ticket } from "@specdriven/shared";
+import type { Attachment, Comment, Tag, Ticket } from "@specdriven/shared";
 import {
   ApiError,
   attachmentHasBinary,
@@ -8,24 +8,33 @@ import {
   createComment,
   getAttachmentDownload,
   getTicket,
+  getTicketSla,
   listAttachments,
   listComments,
+  listTicketTags,
   uploadAttachment,
+  type TicketSla,
 } from "../lib/api";
 import {
   formatDate,
+  formatMinutes,
   moduleLabel,
   priorityLabel,
+  slaStateLabel,
   statusLabel,
   ticketTypeLabel,
 } from "../lib/labels";
+import { usePortalSettings } from "../lib/usePortalSettings";
 
 export function TicketDetailPage() {
   const { key = "" } = useParams();
   const location = useLocation();
+  const { settings: portalSettings } = usePortalSettings();
   const flash = (location.state as { flash?: string } | null)?.flash;
   const [ticket, setTicket] = useState<Ticket | null>(null);
+  const [sla, setSla] = useState<TicketSla | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [storageConfigured, setStorageConfigured] = useState(false);
   const [body, setBody] = useState("");
@@ -41,13 +50,17 @@ export function TicketDetailPage() {
     setLoading(true);
     setError(null);
     try {
-      const [t, c, a] = await Promise.all([
+      const [t, c, a, slaRes, tagsRes] = await Promise.all([
         getTicket(key),
         listComments(key),
         listAttachments(key),
+        getTicketSla(key).catch(() => null),
+        listTicketTags(key).catch(() => null),
       ]);
       setTicket(t.ticket);
+      setSla(slaRes?.sla ?? null);
       setComments(c.comments);
+      setTags(tagsRes?.tags ?? []);
       setAttachments(a.attachments);
       setStorageConfigured(Boolean(a.storageConfigured));
     } catch (err) {
@@ -126,6 +139,14 @@ export function TicketDetailPage() {
     }
   }
 
+  const moduleLabels = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const m of portalSettings?.enabledModules ?? []) {
+      map[m.key] = m.label;
+    }
+    return map;
+  }, [portalSettings]);
+
   return (
     <>
       <div className="page-head">
@@ -151,6 +172,43 @@ export function TicketDetailPage() {
 
       {ticket ? (
         <div className="panel">
+          {sla ? (
+            <div className="sla-block">
+              <div className="sla-block-row">
+                <span className={`badge badge-sla-${sla.state}`}>
+                  SLA · {slaStateLabel(sla.state)}
+                </span>
+                {sla.dueAt ? (
+                  <span className="muted sla-meta">
+                    Prazo: {formatDate(sla.dueAt)}
+                  </span>
+                ) : null}
+                {sla.elapsedBusinessMinutes != null ? (
+                  <span className="muted sla-meta">
+                    Decorrido: {formatMinutes(sla.elapsedBusinessMinutes)}
+                  </span>
+                ) : null}
+                {sla.remainingBusinessMinutes != null &&
+                sla.state !== "done" &&
+                sla.state !== "breached" ? (
+                  <span className="muted sla-meta">
+                    Restante: {formatMinutes(sla.remainingBusinessMinutes)}
+                  </span>
+                ) : null}
+              </div>
+              {sla.message ? (
+                <p className="muted sla-message">{sla.message}</p>
+              ) : null}
+              {portalSettings?.businessHoursSummary ? (
+                <p
+                  className="muted sla-message"
+                  title={portalSettings.businessHoursSummary}
+                >
+                  {portalSettings.businessHoursSummary}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
           <dl className="detail-grid">
             <div className="detail-row">
               <dt>Status</dt>
@@ -175,7 +233,7 @@ export function TicketDetailPage() {
             {ticket.module ? (
               <div className="detail-row">
                 <dt>Módulo</dt>
-                <dd>{moduleLabel(ticket.module)}</dd>
+                <dd>{moduleLabel(ticket.module, moduleLabels)}</dd>
               </div>
             ) : null}
             <div className="detail-row">
@@ -186,6 +244,32 @@ export function TicketDetailPage() {
               <div className="detail-row detail-row-block">
                 <dt>Descrição</dt>
                 <dd style={{ whiteSpace: "pre-wrap" }}>{ticket.description}</dd>
+              </div>
+            ) : null}
+            {tags.length > 0 ? (
+              <div className="detail-row detail-row-block">
+                <dt>Tags</dt>
+                <dd>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
+                    {tags.map((tag) => (
+                      <span
+                        key={tag.id}
+                        className="tag-pill"
+                        style={
+                          tag.color
+                            ? {
+                                background: `${tag.color}22`,
+                                color: tag.color,
+                                borderColor: `${tag.color}55`,
+                              }
+                            : undefined
+                        }
+                      >
+                        {tag.name}
+                      </span>
+                    ))}
+                  </div>
+                </dd>
               </div>
             ) : null}
           </dl>

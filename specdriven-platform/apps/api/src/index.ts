@@ -13,7 +13,11 @@ import {
   rejectApprovalHandler,
 } from "./approvals.js";
 import { listAuditHandler } from "./audit.js";
-import { loginHandler, meHandler } from "./auth.js";
+import { loginHandler, meHandler, switchOrgHandler, exitOrgHandler } from "./auth.js";
+import {
+  forgotPasswordHandler,
+  resetPasswordHandler,
+} from "./password-reset.js";
 import {
   createAttachmentHandler,
   getAttachmentDownloadHandler,
@@ -33,7 +37,9 @@ import {
   listCommentsHandler,
 } from "./comments.js";
 import {
+  assertCorsOriginsForProduction,
   assertJwtSecretForProduction,
+  parseCorsOrigins,
   registerHardening,
 } from "./hardening.js";
 import {
@@ -61,8 +67,31 @@ import {
   getTicketSlaHandler,
   listSlaPoliciesHandler,
   patchSlaPolicyHandler,
+  recalculateOpenSlaHandler,
 } from "./sla.js";
-import { ensureBucket, isStorageConfigured } from "./storage.js";
+import {
+  getSettingsHandler,
+  patchOrganizationSettingsHandler,
+  patchPortalSettingsHandler,
+  patchEmailSettingsHandler,
+  patchNotificationSettingsHandler,
+  postEmailTestHandler,
+  patchSlaSettingsHandler,
+  portalSettingsHandler,
+  listModulesHandler,
+  createModuleHandler,
+  patchModuleHandler,
+  deleteModuleHandler,
+  listHolidaysHandler,
+  createHolidayHandler,
+  deleteHolidayHandler,
+  uploadOrganizationLogoHandler,
+} from "./settings.js";
+import {
+  checkStorageHealth,
+  ensureBucket,
+  isStorageConfigured,
+} from "./storage.js";
 import { syncPullHandler, syncPushHandler } from "./sync.js";
 import {
   addTicketTagHandler,
@@ -96,6 +125,7 @@ import {
   createProjectHandler,
   listProjectsHandler,
 } from "./projects.js";
+import { prisma } from "./db.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(here, "../../../.env") });
@@ -106,6 +136,7 @@ const HOST = process.env.HOST ?? "0.0.0.0";
 
 async function buildServer() {
   assertJwtSecretForProduction();
+  assertCorsOriginsForProduction();
 
   const app = Fastify({
     logger: true,
@@ -114,8 +145,15 @@ async function buildServer() {
   await registerHardening(app);
   await registerOpenApi(app);
 
+  const corsOrigins = parseCorsOrigins();
   await app.register(cors, {
-    origin: true,
+    origin: (origin, cb) => {
+      if (!origin || corsOrigins.includes(origin)) {
+        cb(null, true);
+        return;
+      }
+      cb(null, false);
+    },
   });
 
   await app.register(multipart, {
@@ -125,8 +163,30 @@ async function buildServer() {
     },
   });
 
-  app.get("/health", async () => {
-    return { status: "ok" as const };
+  app.get("/health", async (_request, reply) => {
+    const checks: Record<string, "ok" | "error" | "skipped"> = {
+      database: "ok",
+      storage: isStorageConfigured() ? "ok" : "skipped",
+    };
+    let status: "ok" | "degraded" | "error" = "ok";
+
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+    } catch {
+      checks.database = "error";
+      status = "error";
+    }
+
+    if (isStorageConfigured()) {
+      const storageOk = await checkStorageHealth();
+      checks.storage = storageOk ? "ok" : "error";
+      if (!storageOk && status === "ok") {
+        status = "degraded";
+      }
+    }
+
+    const code = status === "error" ? 503 : 200;
+    return reply.status(code).send({ status, checks });
   });
 
   const helloPayload = {
@@ -139,7 +199,11 @@ async function buildServer() {
   app.get("/hello", async () => helloPayload);
 
   app.post("/auth/login", loginHandler);
+  app.post("/auth/forgot-password", forgotPasswordHandler);
+  app.post("/auth/reset-password", resetPasswordHandler);
   app.get("/auth/me", meHandler);
+  app.post("/auth/switch-org", switchOrgHandler);
+  app.post("/auth/exit-org", exitOrgHandler);
 
   app.get("/clients", listClientsHandler);
   app.post("/clients", createClientHandler);
@@ -221,6 +285,24 @@ async function buildServer() {
   app.get("/projects", listProjectsHandler);
   app.post("/projects", createProjectHandler);
 
+  app.get("/settings", getSettingsHandler);
+  app.patch("/settings/organization", patchOrganizationSettingsHandler);
+  app.post("/settings/organization/logo", uploadOrganizationLogoHandler);
+  app.patch("/settings/portal", patchPortalSettingsHandler);
+  app.patch("/settings/email", patchEmailSettingsHandler);
+  app.patch("/settings/notifications", patchNotificationSettingsHandler);
+  app.post("/settings/email/test", postEmailTestHandler);
+  app.patch("/settings/sla", patchSlaSettingsHandler);
+  app.post("/settings/sla/recalculate-open", recalculateOpenSlaHandler);
+  app.get("/settings/holidays", listHolidaysHandler);
+  app.post("/settings/holidays", createHolidayHandler);
+  app.delete("/settings/holidays/:id", deleteHolidayHandler);
+  app.get("/settings/modules", listModulesHandler);
+  app.post("/settings/modules", createModuleHandler);
+  app.patch("/settings/modules/:id", patchModuleHandler);
+  app.delete("/settings/modules/:id", deleteModuleHandler);
+  app.get("/portal/settings", portalSettingsHandler);
+
   app.get("/_meta/routes", async () => {
     return {
       implemented: [
@@ -236,6 +318,13 @@ async function buildServer() {
         "GET|POST /organizations",
         "POST /organizations/:organizationId/users",
         "GET|POST /projects",
+        "GET /settings",
+        "PATCH /settings/organization",
+        "PATCH /settings/portal",
+        "PATCH /settings/sla",
+        "GET|POST|DELETE /settings/holidays",
+        "GET|POST|PATCH|DELETE /settings/modules",
+        "GET /portal/settings",
         "PATCH /users/:id/billing",
         "GET|POST /tickets",
         "GET|PATCH|DELETE /tickets/:key",
@@ -290,6 +379,8 @@ async function buildServer() {
   return app;
 }
 
+export { buildServer };
+
 async function main() {
   const app = await buildServer();
 
@@ -310,4 +401,6 @@ async function main() {
   }
 }
 
-void main();
+if (!process.env.VITEST) {
+  void main();
+}
