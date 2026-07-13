@@ -1,0 +1,407 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  master
+  admin
+  gestor
+  consultor
+  cliente
+}
+
+enum TicketStatus {
+  backlog
+  em_andamento
+  aguardando_cliente
+  em_teste
+  concluido
+  cancelado
+}
+
+enum CommentVisibility {
+  public
+  internal
+}
+
+enum ApprovalKind {
+  ticket
+  hour_limit
+  time_entry
+}
+
+enum ApprovalStatus {
+  pending
+  approved
+  rejected
+}
+
+enum TicketType {
+  melhoria
+  incidente
+  duvida
+  problema
+}
+
+model Organization {
+  id                  String   @id @default(uuid())
+  name                String
+  /// Consultoria master da plataforma (ex. Blend IT).
+  isMasterConsultancy Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  clients          Client[]
+  users            User[]
+  tickets          Ticket[]
+  invites          Invite[]
+  timeEntries      TimeEntry[]
+  tags             Tag[]
+  slaPolicies      SlaPolicy[]
+  approvalRequests ApprovalRequest[]
+  notifications    Notification[]
+  auditEvents      AuditEvent[]
+  projects         Project[]
+
+  @@map("organizations")
+}
+
+model Client {
+  id                  String   @id @default(uuid())
+  organizationId      String
+  name                String
+  code                String?
+  /// Horas/mês contratadas no baseline (controle consultoria).
+  baselineHoursMonth  Float?
+  /// Taxa hora base em centavos (opcional).
+  hourlyRateCents     Int?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  users        User[]
+  tickets      Ticket[]
+  invites      Invite[]
+  slaPolicies  SlaPolicy[]
+  projects     Project[]
+
+  @@index([organizationId])
+  @@map("clients")
+}
+
+model Project {
+  id             String   @id @default(uuid())
+  organizationId String
+  clientId       String
+  name           String
+  code           String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([clientId])
+  @@map("projects")
+}
+
+model User {
+  id             String   @id @default(uuid())
+  organizationId String
+  email          String
+  name           String
+  passwordHash   String
+  role           UserRole
+  clientId       String?
+  /// Fator de taxa hora do consultor (ex. 1.2 = +20%).
+  hourRateFactor Float    @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization       Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client             Client?               @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  assignedTickets    Ticket[]              @relation("TicketAssignee")
+  comments           Comment[]
+  timeEntries        TimeEntry[]
+  statusChanges      TicketStatusHistory[] @relation("StatusChangedBy")
+  requestedApprovals ApprovalRequest[]     @relation("ApprovalRequester")
+  reviewedApprovals  ApprovalRequest[]     @relation("ApprovalReviewer")
+  notifications      Notification[]
+
+  @@unique([organizationId, email])
+  @@index([organizationId])
+  @@index([clientId])
+  @@map("users")
+}
+
+model Ticket {
+  id                    String       @id @default(uuid())
+  organizationId        String
+  clientId              String
+  key                   String
+  title                 String
+  description           String?
+  status                TicketStatus @default(backlog)
+  priority              String?
+  assigneeId            String?
+  estimateMinutes       Int?
+  /// Limite de horas (minutos) definido pelo gestor; exceder exige aprovação.
+  hourLimitMinutes      Int?
+  ticketType            TicketType   @default(melhoria)
+  /// Nome da empresa informado pelo cliente na abertura.
+  companyName           String?
+  /// Módulo/área do sistema (lista configurável no shared).
+  module                String?
+  countsTowardBaseline  Boolean      @default(true)
+  /// Prazo SLA de resolução (horas úteis do client).
+  slaDueAt              DateTime?
+  firstResponseAt       DateTime?
+  resolvedAt            DateTime?
+  deletedAt             DateTime?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  organization     Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client           Client                @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  assignee         User?                 @relation("TicketAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  comments         Comment[]
+  attachments      Attachment[]
+  timeEntries      TimeEntry[]
+  ticketTags       TicketTag[]
+  statusHistory    TicketStatusHistory[]
+  approvalRequests ApprovalRequest[]
+
+  @@unique([organizationId, key])
+  @@index([organizationId])
+  @@index([clientId])
+  @@index([assigneeId])
+  @@index([status])
+  @@index([slaDueAt])
+  @@index([deletedAt])
+  @@map("tickets")
+}
+
+model Comment {
+  id         String            @id @default(uuid())
+  ticketId   String
+  authorId   String
+  body       String
+  visibility CommentVisibility @default(public)
+  createdAt  DateTime          @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@index([authorId])
+  @@map("comments")
+}
+
+model Attachment {
+  id         String   @id @default(uuid())
+  ticketId   String
+  storageKey String
+  fileName   String
+  mimeType   String?
+  sizeBytes  Int?
+  createdAt  DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@map("attachments")
+}
+
+model Invite {
+  id             String    @id @default(uuid())
+  organizationId String
+  email          String
+  role           UserRole
+  clientId       String?
+  token          String    @unique
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       Client?      @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([email])
+  @@map("invites")
+}
+
+/// Time tracking (Fase C — aprovações de horas / limite por ticket).
+model TimeEntry {
+  id             String         @id @default(uuid())
+  organizationId String
+  ticketId       String
+  userId         String
+  startedAt      DateTime
+  endedAt        DateTime?
+  seconds        Int?
+  note           String?
+  /// pending quando excede limite e aguarda gestor; approved caso contrário.
+  approvalStatus ApprovalStatus @default(approved)
+  createdAt      DateTime       @default(now())
+
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  ticket           Ticket            @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  approvalRequests ApprovalRequest[]
+
+  @@index([organizationId])
+  @@index([ticketId])
+  @@index([userId])
+  @@index([approvalStatus])
+  @@map("time_entries")
+}
+
+/// Workflow de aprovação: chamado (ex. fechar), limite de horas, lançamento de horas.
+model ApprovalRequest {
+  id               String         @id @default(uuid())
+  organizationId   String
+  kind             ApprovalKind
+  status           ApprovalStatus @default(pending)
+  ticketId         String
+  timeEntryId      String?
+  requesterId      String
+  reviewerId       String?
+  /// Status alvo do chamado (kind=ticket), ex. concluido.
+  targetStatus     TicketStatus?
+  /// Novo limite solicitado em minutos (kind=hour_limit).
+  requestedMinutes Int?
+  reason           String?
+  decisionNote     String?
+  decidedAt        DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  ticket       Ticket       @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  timeEntry    TimeEntry?   @relation(fields: [timeEntryId], references: [id], onDelete: SetNull)
+  requester    User         @relation("ApprovalRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  reviewer     User?        @relation("ApprovalReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([ticketId])
+  @@index([status])
+  @@index([kind])
+  @@index([requesterId])
+  @@map("approval_requests")
+}
+
+/// Tags de ticket (Fase E — ownership SLA/tags).
+model Tag {
+  id             String   @id @default(uuid())
+  organizationId String
+  name           String
+  color          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  ticketTags   TicketTag[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("tags")
+}
+
+model TicketTag {
+  ticketId  String
+  tagId     String
+  createdAt DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([ticketId, tagId])
+  @@index([tagId])
+  @@map("ticket_tags")
+}
+
+/// Política SLA por org/cliente (Fase E — ownership SLA/tags).
+model SlaPolicy {
+  id                 String   @id @default(uuid())
+  organizationId     String
+  clientId           String
+  name               String
+  /// Match de prioridade do ticket; vazio = default do cliente.
+  priorityMatch      String   @default("")
+  responseMinutes    Int
+  resolutionMinutes  Int
+  businessHourStart  Int      @default(9)
+  businessHourEnd    Int      @default(18)
+  /// Dias da semana 0=Dom … 6=Sáb, CSV (ex. 1,2,3,4,5).
+  weekdays           String   @default("1,2,3,4,5")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, priorityMatch])
+  @@index([organizationId])
+  @@index([clientId])
+  @@map("sla_policies")
+}
+
+/// Histórico de mudanças de status (Fase E — ownership SLA/tags).
+model TicketStatusHistory {
+  id          String        @id @default(uuid())
+  ticketId    String
+  fromStatus  TicketStatus?
+  toStatus    TicketStatus
+  changedById String
+  note        String?
+  createdAt   DateTime      @default(now())
+
+  ticket    Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  changedBy User   @relation("StatusChangedBy", fields: [changedById], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@index([changedById])
+  @@map("ticket_status_history")
+}
+
+model Notification {
+  id             String    @id @default(uuid())
+  organizationId String
+  userId         String
+  title          String
+  body           String?
+  href           String?
+  readAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, userId])
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+model AuditEvent {
+  id             String   @id @default(uuid())
+  organizationId String
+  actorId        String?
+  action         String
+  entityType     String
+  entityId       String?
+  metaJson       String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([entityType])
+  @@map("audit_events")
+}

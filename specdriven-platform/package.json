@@ -1,0 +1,24 @@
+{
+  "name": "specdriven-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SpecDriven cloud platform monorepo",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @specdriven/shared && npm run build -w @specdriven/api && npm run build -w @specdriven/web-client && npm run build -w @specdriven/web-staff",
+    "build:shared": "npm run build -w @specdriven/shared",
+    "dev:api": "npm run dev -w @specdriven/api",
+    "dev:web-client": "npm run dev -w @specdriven/web-client",
+    "dev:web-staff": "npm run dev -w @specdriven/web-staff",
+    "db:generate": "npm run db:generate -w @specdriven/api",
+    "db:push": "npm run db:push -w @specdriven/api",
+    "db:seed": "npm run db:seed -w @specdriven/api",
+    "typecheck": "npm run typecheck -w @specdriven/shared && npm run typecheck -w @specdriven/api && npm run typecheck -w @specdriven/web-client && npm run typecheck -w @specdriven/web-staff"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

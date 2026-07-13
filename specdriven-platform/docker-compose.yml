@@ -1,0 +1,52 @@
+# Local development only — credentials are intentionally simple.
+services:
+  postgres:
+    image: postgres:16
+    container_name: specdriven-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: specdriven
+      POSTGRES_PASSWORD: specdriven
+      POSTGRES_DB: specdriven
+    volumes:
+      - specdriven_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U specdriven -d specdriven"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: specdriven-minio
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - specdriven_minio:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # SMTP catcher for local mail (UI http://localhost:8025, SMTP :1025)
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: specdriven-mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+volumes:
+  specdriven_pgdata:
+  specdriven_minio:
