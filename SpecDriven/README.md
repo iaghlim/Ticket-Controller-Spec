@@ -4,6 +4,8 @@ App desktop **local** (Tauri 2 + React + TypeScript) para organizar atendimentos
 
 **Sem Jira API, sem rede obrigatória, sem cloud.** O campo `jiraUrl` é apenas texto/link opcional no `meta.json`.
 
+> **Instalação:** para subir o app desktop (Rust, dependências, primeiro uso), veja o [Guia de instalação](../docs/guia-instalacao.md#parte-3--app-desktop-specdriven). Para a plataforma cloud, veja a [Parte 2](../docs/guia-instalacao.md#parte-2--plataforma-cloud-specdriven-platform).
+
 ## Pré-requisitos (Windows)
 
 1. **Node.js** 20+ (`node -v`)

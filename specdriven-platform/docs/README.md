@@ -8,7 +8,8 @@ Complementa (não substitui) a documentação do app desktop local em SpecDriven
 
 | Doc | Conteúdo |
 |-----|----------|
-| **[Guia de uso](guia-de-uso.md)** | Como subir o ambiente e usar portais, aprovações e sync desktop |
+| **[Guia de instalação](../../docs/guia-instalacao.md)** | Instalação completa: Docker, dependências, banco, API e portais |
+| **[Guia de uso](guia-de-uso.md)** | Como usar portais, aprovações e sync desktop |
 
 ## Índice técnico
 
@@ -28,6 +29,7 @@ Complementa (não substitui) a documentação do app desktop local em SpecDriven
 - **Monorepo:** npm workspaces (`apps/api`, `apps/web-client`, `packages/shared`)
 - **Tenancy:** uma organização por instalação lógica; N clientes sob a org
 - **README raiz:** setup operacional (Docker, `npm run dev:api`, `npm run dev:web-client`)
+- **Instalação detalhada:** [Guia de instalação](../../docs/guia-instalacao.md)
 
 ## Como contribuir nesta pasta
 

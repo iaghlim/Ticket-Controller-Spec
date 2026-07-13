@@ -2,6 +2,8 @@
 
 MVP bootstrap da plataforma cloud SpecDriven — monorepo com API Fastify, portais React (cliente e consultoria), tipos compartilhados e Postgres.
 
+> **Primeira instalação?** Siga o [Guia de instalação](../docs/guia-instalacao.md) — passo a passo com Docker, dependências e verificação.
+
 ## Stack
 
 | Peça | Tecnologia |
@@ -21,6 +23,8 @@ MVP bootstrap da plataforma cloud SpecDriven — monorepo com API Fastify, porta
 - Docker Desktop (para Postgres local)
 
 ## Setup rápido
+
+Resumo — instalação completa em [docs/guia-instalacao.md](../docs/guia-instalacao.md).
 
 ```powershell
 # 1. Dependências

@@ -29,7 +29,9 @@ Chamado de demonstração: **DEMO-1** (cliente **Cliente Demo**).
 
 ## 2. Subir o ambiente local
 
-Pré-requisitos: Node.js ≥ 20, npm ≥ 10, Docker Desktop.
+> **Instalação detalhada (primeira vez):** siga o [Guia de instalação](../../docs/guia-instalacao.md) na raiz do repositório — inclui instalação de Node, Docker, `.env`, banco e verificação passo a passo.
+
+Resumo para quem já tem tudo instalado:
 
 ```powershell
 cd D:\Aceleradores\specdriven-platform
@@ -63,7 +65,7 @@ Checklist rápido:
 2. Abrir portal cliente ou staff e fazer login com a seed correspondente
 3. OpenAPI: http://localhost:3000/docs
 
-Detalhes de scripts e variáveis: [README raiz](../README.md).
+Detalhes de scripts e variáveis: [README raiz](../README.md) · instalação completa: [Guia de instalação](../../docs/guia-instalacao.md).
 
 ---
 

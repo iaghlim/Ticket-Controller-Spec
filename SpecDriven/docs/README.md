@@ -2,6 +2,10 @@
 
 Documentação funcional e técnica do produto **SpecDriven** — app desktop local para organizar atendimentos (Cliente → Chamado) e gerar documentos Word (EF / ET / TU).
 
+## Instalação
+
+Para instalar e rodar o app (e a plataforma cloud), use o **[Guia de instalação](../../docs/guia-instalacao.md)** na raiz do repositório.
+
 ## Índice
 
 ### Funcional
