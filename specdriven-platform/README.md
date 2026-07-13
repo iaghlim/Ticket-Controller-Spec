@@ -111,3 +111,7 @@ docs/             # arquitetura, modelo de dados, API
 As credenciais do `docker-compose.yml` são **somente para desenvolvimento local**. Não use em produção e não versionar `.env` com secrets reais.
 
 OpenAPI: `http://localhost:3000/docs` · CI: `.github/workflows/ci.yml` · Sync desktop: [docs/sync-desktop.md](docs/sync-desktop.md).
+
+## Licença
+
+Proprietary — All Rights Reserved. See [LICENSE](../LICENSE).

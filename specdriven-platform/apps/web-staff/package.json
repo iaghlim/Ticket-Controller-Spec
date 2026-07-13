@@ -2,6 +2,7 @@
   "name": "@specdriven/web-staff",
   "version": "0.1.0",
   "private": true,
+  "license": "UNLICENSED",
   "description": "SpecDriven consultancy (staff) portal",
   "type": "module",
   "scripts": {

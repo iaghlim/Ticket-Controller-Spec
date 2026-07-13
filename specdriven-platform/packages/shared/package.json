@@ -2,6 +2,7 @@
   "name": "@specdriven/shared",
   "version": "0.1.0",
   "private": true,
+  "license": "UNLICENSED",
   "description": "Shared types and Zod schemas for SpecDriven platform",
   "type": "module",
   "main": "./dist/index.js",

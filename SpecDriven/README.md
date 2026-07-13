@@ -149,4 +149,4 @@ Documentação funcional e técnica: [`docs/`](docs/README.md).
 
 ## Licença
 
-Uso interno / projeto local.
+Proprietary — All Rights Reserved. See [LICENSE](../LICENSE).

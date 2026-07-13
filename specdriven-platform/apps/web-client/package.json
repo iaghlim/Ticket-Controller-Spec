@@ -2,6 +2,7 @@
   "name": "@specdriven/web-client",
   "version": "0.1.0",
   "private": true,
+  "license": "UNLICENSED",
   "description": "SpecDriven client portal",
   "type": "module",
   "scripts": {
