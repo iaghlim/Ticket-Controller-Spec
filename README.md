@@ -1,6 +1,6 @@
 # Ticket Controller Spec
 
-Monorepo do ecossistema SpecDriven — controle de chamados, documentação e plataforma cloud.
+Projeto de construção de uma solução de controle de tickets e projetos
 
 ## Projetos
 
@@ -8,7 +8,7 @@ Monorepo do ecossistema SpecDriven — controle de chamados, documentação e pl
 |-------|-----------|
 | [`SpecDriven/`](SpecDriven/) | App desktop local (Tauri + React) |
 | [`specdriven-platform/`](specdriven-platform/) | Plataforma cloud (API + portais web) |
-| [`Mock_FIGMA/`](Mock_FIGMA/) | Mock UI do dashboard (Figma) |
+
 
 ## Licença
 
