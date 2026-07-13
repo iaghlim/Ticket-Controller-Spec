@@ -4,8 +4,7 @@ Projeto de construção de uma solução de controle de tickets e projetos.
 
 ## Comece aqui
 
-**[Guia de instalação](docs/guia-instalacao.md)** — passo a passo para instalar ferramentas, configurar Docker, dependências e subir a plataforma (escrito para repasse a pessoas com nível técnico básico).
-
+**[Guia de instalação](docs/guia-instalacao.md)** — passo a passo para instalar ferramentas, configurar Docker, dependências e subir a plataforma
 Índice geral da documentação: [docs/README.md](docs/README.md).
 
 ## Projetos
