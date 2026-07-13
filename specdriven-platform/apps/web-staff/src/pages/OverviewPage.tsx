@@ -18,6 +18,7 @@ import {
 } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import {
+  NOT_CONFIGURED,
   priorityLabel,
   shortId,
   statusLabel,
@@ -232,9 +233,9 @@ export function OverviewPage() {
           </p>
         </div>
         <div className="page-head-actions">
-          <button type="button" className="btn btn-ghost btn-sm" disabled>
-            Período
-          </button>
+          <span className="page-head-unconfigured">
+            Período · <span className="unconfigured-label">{NOT_CONFIGURED}</span>
+          </span>
         </div>
       </div>
 
@@ -258,14 +259,20 @@ export function OverviewPage() {
               <span className="kpi-card-icon">◔</span>
               <p className="kpi-card-label">SLA cumprido</p>
               <p className="kpi-card-value">
-                {slaOkPct != null ? `${slaOkPct}%` : "—"}
+                {slaOkPct != null ? (
+                  `${slaOkPct}%`
+                ) : (
+                  <span className="unconfigured-label">{NOT_CONFIGURED}</span>
+                )}
               </p>
               <p className="kpi-card-note">meta ≥ 90%</p>
             </div>
             <div className="kpi-card">
               <span className="kpi-card-icon">◷</span>
               <p className="kpi-card-label">Tempo de resposta</p>
-              <p className="kpi-card-value">—</p>
+              <p className="kpi-card-value">
+                <span className="unconfigured-label">{NOT_CONFIGURED}</span>
+              </p>
               <p className="kpi-card-note">média do período</p>
             </div>
             <div className="kpi-card">

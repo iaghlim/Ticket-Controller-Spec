@@ -1,5 +1,7 @@
 import type { TicketModule, TicketPriority, TicketStatus, TicketType } from "@specdriven/shared";
 
+export const NOT_CONFIGURED = "não configurado";
+
 export const STATUS_LABELS: Record<TicketStatus, string> = {
   backlog: "Backlog",
   em_andamento: "Em andamento",

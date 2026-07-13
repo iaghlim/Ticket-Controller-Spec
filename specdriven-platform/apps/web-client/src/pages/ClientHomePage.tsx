@@ -10,6 +10,7 @@ import { ApiError, listTickets } from "../lib/api";
 import { useClientContext } from "../lib/useClientContext";
 import {
   formatDate,
+  NOT_CONFIGURED,
   priorityLabel,
   statusLabel,
   ticketTypeLabel,
@@ -199,21 +200,24 @@ export function ClientHomePage() {
             <div className="tracking-row">
               <span>Chamados em aberto</span>
               <strong className="mono">
-                {loading ? "—" : String(openTickets.length).padStart(2, "0")}
+                {loading
+                  ? "…"
+                  : String(openTickets.length).padStart(2, "0")}
               </strong>
             </div>
             <div className="tracking-row">
               <span>SLA do mês</span>
-              <strong className="mono tracking-highlight">—</strong>
+              <strong className="unconfigured-label">{NOT_CONFIGURED}</strong>
             </div>
             <div className="tracking-row">
               <span>Última atualização</span>
-              <strong>{lastUpdate ?? "—"}</strong>
+              <strong>{lastUpdate ?? "nenhum"}</strong>
             </div>
           </div>
-          <button type="button" className="btn btn-ghost btn-block" disabled>
-            Consultar base de conhecimento
-          </button>
+          <div className="tracking-kb">
+            <span>Consultar base de conhecimento</span>
+            <span className="unconfigured-label">{NOT_CONFIGURED}</span>
+          </div>
         </aside>
       </div>
 

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, NavLink, Navigate, Outlet, useLocation } from "react-router-dom";
 import { listApprovals, listTickets } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { roleLabel } from "../lib/labels";
+import { NOT_CONFIGURED, roleLabel } from "../lib/labels";
 import { StaffSearch } from "./StaffSearch";
 
 function initials(name: string): string {
@@ -283,9 +283,10 @@ export function AppLayout() {
         </ul>
 
         <div className="sidebar-footer">
-          <button type="button" className="nav-item" disabled style={{ opacity: 0.5, cursor: "default" }}>
+          <span className="nav-item nav-item-unconfigured">
             Configurações
-          </button>
+            <span className="nav-item-sub unconfigured-label">{NOT_CONFIGURED}</span>
+          </span>
           <div className="sidebar-user">
             <div className="sidebar-user-avatar">{initials(displayName)}</div>
             <div className="sidebar-user-info">

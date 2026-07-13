@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../lib/auth";
+import { NOT_CONFIGURED } from "../lib/labels";
 import { useClientContext } from "../lib/useClientContext";
 
 function initials(name: string): string {
@@ -119,9 +120,10 @@ export function AppLayout() {
             >
               Meus chamados
             </NavLink>
-            <button type="button" className="client-nav-link" disabled>
+            <span className="client-nav-link client-nav-unconfigured">
               Base de conhecimento
-            </button>
+              <small className="unconfigured-label">{NOT_CONFIGURED}</small>
+            </span>
             <button
               type="button"
               className="client-nav-link client-nav-logout"
@@ -132,10 +134,10 @@ export function AppLayout() {
           </nav>
 
           <div className="client-header-actions">
-            <button type="button" className="icon-btn" aria-label="Notificações" disabled>
+            <span className="client-notifications-slot" aria-label="Notificações">
               <IconBell />
-              <span className="icon-btn-dot" />
-            </button>
+              <span className="unconfigured-label">{NOT_CONFIGURED}</span>
+            </span>
             <div className="client-user">
               <div className="client-user-avatar">{initials(displayName)}</div>
               <span className="client-user-name">{displayName}</span>
