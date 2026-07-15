@@ -53,6 +53,25 @@ npm run db:migrate:deploy
 
 Em deploy Docker, execute o comando acima **antes** de subir a API pela primeira vez, ou rode em um job/init container com a mesma `DATABASE_URL`.
 
+### 2.1 Provisionar Usuário Master Inicial (Bootstrap)
+
+Em bancos de dados de produção limpos, o sistema não contém usuários pré-cadastrados. Para criar a primeira conta administrativa (`master`), execute o script de bootstrap após rodar as migrações:
+
+```bash
+npm run db:bootstrap
+```
+
+Você pode customizar o usuário e a organização iniciais definindo as seguintes variáveis no seu arquivo `.env` antes de executar o comando:
+
+- `MASTER_EMAIL` (padrão: `master@blendit.local`)
+- `MASTER_PASSWORD` (se omitida, uma senha aleatória segura será gerada e impressa no console)
+- `MASTER_NAME` (padrão: `Master`)
+- `ORG_NAME` (padrão: `Blend IT`)
+
+> [!IMPORTANT]
+> Guarde a senha gerada/configurada exibida no terminal. Use-a no primeiro acesso para logar e, em seguida, configure seu ambiente real no portal staff.
+
+
 ### 3. Build e subida
 
 Stack completa (API + portais + Postgres):

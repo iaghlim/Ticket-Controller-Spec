@@ -15,10 +15,10 @@ A geração usa formulários (drafts JSON) + templates `.docx` com placeholders 
 | Princípio | Significado |
 |-----------|-------------|
 | Local-first | Tudo vive em arquivos na pasta escolhida pelo usuário |
-| Sem cloud | Não há backend remoto nem sync |
+| Cloud opcional | Suporte opcional a sincronização com a SpecDriven Platform |
 | Sem Jira API | `jiraUrl` é só texto/link opcional no `meta.json` |
 | Portátil | Workspace = árvore de pastas; dá para copiar, ZIP e versionar fora do app |
-| Offline | Rede não é requisito para operar |
+| Offline | Rede não é requisito para operar localmente |
 
 ## Persona / contexto de uso
 

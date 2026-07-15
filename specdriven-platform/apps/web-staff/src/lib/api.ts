@@ -40,6 +40,7 @@ export type LoginResponse = {
   token: string;
   user: AuthUser;
   mode: string;
+  csrfToken?: string;
 };
 
 /** Prioridades alinhadas ao desktop (PATCH /tickets/:key). */
@@ -129,6 +130,16 @@ export class ApiError extends Error {
   }
 }
 
+let csrfToken: string | null = null;
+
+export function getCsrfToken(): string | null {
+  return csrfToken;
+}
+
+export function setCsrfToken(token: string | null): void {
+  csrfToken = token;
+}
+
 export function getStoredToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
 }
@@ -144,11 +155,16 @@ async function request<T>(
 ): Promise<T> {
   const { token, headers, ...rest } = options;
   const auth = token === undefined ? getStoredToken() : token;
+  const method = (rest.method ?? "GET").toUpperCase();
+  const isMutation = ["POST", "PATCH", "PUT", "DELETE"].includes(method);
+
   const res = await fetch(`${apiBaseUrl}${path}`, {
     ...rest,
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       ...(auth ? { Authorization: `Bearer ${auth}` } : {}),
+      ...(isMutation && csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
       ...headers,
     },
   });
@@ -160,6 +176,13 @@ async function request<T>(
       body = JSON.parse(text) as unknown;
     } catch {
       body = text;
+    }
+  }
+
+  if (res.ok && body && typeof body === "object") {
+    const maybeToken = (body as Record<string, unknown>).csrfToken;
+    if (typeof maybeToken === "string") {
+      setCsrfToken(maybeToken);
     }
   }
 
@@ -175,12 +198,26 @@ async function request<T>(
   return body as T;
 }
 
-export function login(email: string, password: string) {
-  return request<LoginResponse>("/auth/login", {
+export async function login(email: string, password: string) {
+  const res = await request<LoginResponse>("/auth/login", {
     method: "POST",
     body: JSON.stringify({ email, password }),
     token: null,
   });
+  if (res && res.csrfToken) {
+    setCsrfToken(res.csrfToken);
+  }
+  return res;
+}
+
+export function logout() {
+  return request<{ ok: boolean }>("/auth/logout", {
+    method: "POST",
+  }).catch(() => ({ ok: false }))
+    .finally(() => {
+      setStoredToken(null);
+      setCsrfToken(null);
+    });
 }
 
 export function forgotPassword(email: string) {
@@ -229,9 +266,12 @@ export function createTicket(input: {
   key?: string;
   title: string;
   clientId: string;
+  projectId: string;
   description?: string;
   status?: TicketStatus;
   priority?: string;
+  ticketType?: string;
+  module?: string;
 }) {
   return request<{ ticket: Ticket }>("/tickets", {
     method: "POST",
@@ -302,7 +342,11 @@ export async function uploadAttachment(
     `${apiBaseUrl}/tickets/${encodeURIComponent(key)}/attachments`,
     {
       method: "POST",
-      headers: auth ? { Authorization: `Bearer ${auth}` } : {},
+      credentials: "include",
+      headers: {
+        ...(auth ? { Authorization: `Bearer ${auth}` } : {}),
+        ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
+      },
       body: form,
     },
   );
@@ -381,6 +425,61 @@ export function acceptInvite(input: AcceptInviteInput) {
 
 export function ticketsReport() {
   return request<TicketsReport>("/reports/tickets");
+}
+
+export type ServiceHealthMetrics = {
+  mtta: number | null;
+  mttr: number | null;
+  fcr: number | null;
+  slaPct: number | null;
+  targetSlaPct: number;
+  changeSuccess: {
+    ticket: number | null;
+    hour_limit: number | null;
+    time_entry: number | null;
+  };
+  baselineBurn: number;
+  aging: {
+    "0-3 days": number;
+    "4-7 days": number;
+    "8-14 days": number;
+    "15-30 days": number;
+    "30+ days": number;
+  };
+  baselineBurnTable: {
+    clientId: string;
+    clientName: string;
+    hoursContracted: number;
+    hoursUsed: number;
+    burnPct: number;
+  }[];
+  throughput?: number | null;
+  burnBudget?: number | null;
+  revenuePerTicket?: number | null;
+};
+
+export type TrendPoint = {
+  month: string;
+  throughput: number;
+  burnBudget: number;
+  revenue: number;
+};
+
+export type TrendsReportResponse = {
+  trends: TrendPoint[];
+};
+
+export function getServiceHealth(period: string, clientId?: string, projectId?: string) {
+  const params = new URLSearchParams({ period });
+  if (clientId) params.set("clientId", clientId);
+  if (projectId) params.set("projectId", projectId);
+  return request<ServiceHealthMetrics>(`/reports/service-health?${params.toString()}`);
+}
+
+export function getTrendsReport(projectId?: string) {
+  const params = new URLSearchParams();
+  if (projectId) params.set("projectId", projectId);
+  return request<TrendsReportResponse>(`/reports/trends?${params.toString()}`);
 }
 
 export type ApprovalRow = {
@@ -526,6 +625,51 @@ export function createOrgUser(
   );
 }
 
+export type SupportTier = "N1" | "N2" | "N3";
+
+export type ProjectModuleAssignment = {
+  id: string;
+  projectId: string;
+  module: string;
+  userId: string;
+  tier: SupportTier;
+  createdAt: string;
+  updatedAt: string;
+  user?: User;
+};
+
+
+export type UserProjectLink = {
+  id: string;
+  userId: string;
+  projectId: string;
+  active: boolean;
+  project?: { id: string; name: string; code: string; clientId: string };
+  user?: { id: string; name: string; email: string; role: string; clientId: string | null };
+};
+
+export function listUserProjects(userId?: string, projectId?: string) {
+  const params = new URLSearchParams();
+  if (userId) params.set("userId", userId);
+  if (projectId) params.set("projectId", projectId);
+  const qs = params.toString();
+  return request<{ links: UserProjectLink[] }>(`/user-projects${qs ? `?${qs}` : ""}`);
+}
+
+export function linkUserToProject(projectId: string, userId: string) {
+  return request<{ link: UserProjectLink }>(`/projects/${encodeURIComponent(projectId)}/users`, {
+    method: "POST",
+    body: JSON.stringify({ userId }),
+  });
+}
+
+export function unlinkUserFromProject(projectId: string, userId: string) {
+  return request<{ success: boolean }>(`/projects/${encodeURIComponent(projectId)}/users`, {
+    method: "DELETE",
+    body: JSON.stringify({ userId }),
+  });
+}
+
 export function listProjects(clientId?: string) {
   const q = clientId ? `?clientId=${encodeURIComponent(clientId)}` : "";
   return request<{ projects: Project[] }>(`/projects${q}`);
@@ -534,12 +678,71 @@ export function listProjects(clientId?: string) {
 export function createProject(input: {
   clientId: string;
   name: string;
-  code?: string | null;
+  code: string;
+  billingModel: "per_hour" | "per_ticket" | "fixed_project";
+  baselineHoursMonth?: number | null;
+  hourlyRateCents?: number | null;
+  ticketRateCents?: number | null;
+  budgetCents?: number | null;
+  startDate?: string | Date | null;
+  endDate?: string | Date | null;
 }) {
   return request<{ project: Project }>("/projects", {
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+export function updateProject(
+  projectId: string,
+  input: {
+    name?: string;
+    code?: string;
+    billingModel?: "per_hour" | "per_ticket" | "fixed_project";
+    baselineHoursMonth?: number | null;
+    hourlyRateCents?: number | null;
+    ticketRateCents?: number | null;
+    budgetCents?: number | null;
+    startDate?: string | Date | null;
+    endDate?: string | Date | null;
+  },
+) {
+  return request<{ project: Project }>(`/projects/${encodeURIComponent(projectId)}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function listProjectAssignments(projectId: string) {
+  return request<{ assignments: ProjectModuleAssignment[] }>(
+    `/settings/projects/${encodeURIComponent(projectId)}/assignments`
+  );
+}
+
+export function createProjectAssignment(
+  projectId: string,
+  input: {
+    module: string;
+    userId: string;
+    tier: SupportTier;
+  }
+) {
+  return request<{ assignment: ProjectModuleAssignment }>(
+    `/settings/projects/${encodeURIComponent(projectId)}/assignments`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    }
+  );
+}
+
+export function deleteProjectAssignment(projectId: string, assignmentId: string) {
+  return request<{ ok: boolean }>(
+    `/settings/projects/${encodeURIComponent(projectId)}/assignments/${encodeURIComponent(assignmentId)}`,
+    {
+      method: "DELETE",
+    }
+  );
 }
 
 export function getTicketSla(key: string) {
@@ -954,7 +1157,11 @@ export async function uploadOrganizationLogo(
   form.append("file", file, file.name);
   const res = await fetch(`${apiBaseUrl}/settings/organization/logo`, {
     method: "POST",
-    headers: auth ? { Authorization: `Bearer ${auth}` } : {},
+    credentials: "include",
+    headers: {
+      ...(auth ? { Authorization: `Bearer ${auth}` } : {}),
+      ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
+    },
     body: form,
   });
   let body: unknown = null;
@@ -976,3 +1183,494 @@ export async function uploadOrganizationLogo(
   }
   return body as { ok: boolean; logoUrl: string | null };
 }
+
+// --- MOCK PROBLEMS & CHANGES SYSTEM ---
+export type ProblemStatus = "investigating" | "identified" | "known_error" | "closed";
+
+export interface Problem {
+  id: string;
+  organizationId: string;
+  title: string;
+  description: string | null;
+  status: ProblemStatus;
+  rootCause: string | null;
+  workaround: string | null;
+  clientId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  incidents: Ticket[];
+  changes: Change[];
+}
+
+export type ChangeStatus =
+  | "draft"
+  | "pending_approval"
+  | "approved"
+  | "rejected"
+  | "implementing"
+  | "completed"
+  | "failed";
+
+export interface Change {
+  id: string;
+  organizationId: string;
+  title: string;
+  description: string | null;
+  status: ChangeStatus;
+  riskScore: number;
+  rollbackPlan: string | null;
+  windowStart: string | null;
+  windowEnd: string | null;
+  cabDecision: string | null;
+  cabDecisionNote: string | null;
+  cabDecisionAt: string | null;
+  problemId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  tickets?: Ticket[];
+  problem?: Problem | null;
+}
+
+const INITIAL_PROBLEMS = [
+  {
+    id: "prob-1",
+    organizationId: "default-org",
+    title: "Instabilidade nos servidores de banco de dados",
+    description: "Quedas intermitentes de conexão com o banco de dados afetando o portal cliente em horários de pico.",
+    status: "identified" as ProblemStatus,
+    rootCause: "Estouro de memória RAM causado por consultas lentas sem índice adequado na tabela ticket_tags.",
+    workaround: "Reiniciar o serviço de banco de dados quando o consumo de RAM passar de 90%.",
+    clientId: "",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: "prob-2",
+    organizationId: "default-org",
+    title: "Erro 502 Bad Gateway intermitente no upload de anexos",
+    description: "Alguns clientes relatam erro 502 ao fazer upload de arquivos PDF maiores que 5MB.",
+    status: "investigating" as ProblemStatus,
+    rootCause: "",
+    workaround: "Instruir os clientes a comprimirem os arquivos PDF antes do envio.",
+    clientId: "",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }
+];
+
+const INITIAL_CHANGES = [
+  {
+    id: "change-1",
+    organizationId: "default-org",
+    title: "Adição de índices e redimensionamento da CPU/RAM do banco de dados",
+    description: "Criar índices faltantes na tabela ticket_tags e migrar banco de dados para instância com o dobro de RAM.",
+    status: "pending_approval" as ChangeStatus,
+    riskScore: 3,
+    rollbackPlan: "Restaurar backup do snapshot pré-migração e reverter apontamento DNS.",
+    windowStart: new Date(Date.now() + 86400000 * 3).toISOString(),
+    windowEnd: new Date(Date.now() + 86400000 * 3 + 14400000).toISOString(),
+    cabDecision: null,
+    cabDecisionNote: null,
+    cabDecisionAt: null,
+    problemId: "prob-1",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }
+];
+
+const INITIAL_INCIDENTS = [
+  { problemId: "prob-1", ticketKey: "DEMO-1" }
+];
+
+function initMocks() {
+  if (!localStorage.getItem("specdriven.problems")) {
+    localStorage.setItem("specdriven.problems", JSON.stringify(INITIAL_PROBLEMS));
+  }
+  if (!localStorage.getItem("specdriven.changes")) {
+    localStorage.setItem("specdriven.changes", JSON.stringify(INITIAL_CHANGES));
+  }
+  if (!localStorage.getItem("specdriven.problem_incidents")) {
+    localStorage.setItem("specdriven.problem_incidents", JSON.stringify(INITIAL_INCIDENTS));
+  }
+}
+
+export async function listProblems(clientId?: string, status?: ProblemStatus): Promise<Problem[]> {
+  initMocks();
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  const problems = JSON.parse(localStorage.getItem("specdriven.problems") || "[]") as any[];
+  const incs = JSON.parse(localStorage.getItem("specdriven.problem_incidents") || "[]") as any[];
+  
+  let tickets: Ticket[] = [];
+  try {
+    const res = await listTickets();
+    tickets = res.tickets;
+  } catch (e) {
+    // ignore
+  }
+
+  const result: Problem[] = [];
+  for (const p of problems) {
+    const pKeys = incs.filter((i: any) => i.problemId === p.id).map((i: any) => i.ticketKey);
+    const pTickets = tickets.filter((t) => pKeys.includes(t.key));
+    
+    const firstTicketClient = pTickets[0]?.clientId || null;
+    const finalClientId = p.clientId || firstTicketClient;
+
+    if (clientId && finalClientId !== clientId) continue;
+    if (status && p.status !== status) continue;
+
+    result.push({
+      ...p,
+      clientId: finalClientId,
+      incidents: pTickets,
+      changes: [],
+    });
+  }
+
+  return result;
+}
+
+export async function getProblem(id: string): Promise<Problem | null> {
+  initMocks();
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  const problems = JSON.parse(localStorage.getItem("specdriven.problems") || "[]") as any[];
+  const p = problems.find((x: any) => x.id === id);
+  if (!p) return null;
+
+  const incs = JSON.parse(localStorage.getItem("specdriven.problem_incidents") || "[]") as any[];
+  const pKeys = incs.filter((i: any) => i.problemId === p.id).map((i: any) => i.ticketKey);
+  
+  let tickets: Ticket[] = [];
+  try {
+    const res = await listTickets();
+    tickets = res.tickets;
+  } catch (e) {}
+
+  const pTickets = tickets.filter((t) => pKeys.includes(t.key));
+  const firstTicketClient = pTickets[0]?.clientId || null;
+
+  const changes = JSON.parse(localStorage.getItem("specdriven.changes") || "[]") as any[];
+  const pChanges = changes.filter((c: any) => c.problemId === p.id);
+
+  return {
+    ...p,
+    clientId: p.clientId || firstTicketClient,
+    incidents: pTickets,
+    changes: pChanges,
+  };
+}
+
+export async function createProblem(input: {
+  title: string;
+  description?: string;
+  clientId?: string;
+}): Promise<Problem> {
+  initMocks();
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  const problems = JSON.parse(localStorage.getItem("specdriven.problems") || "[]") as any[];
+  const newProb = {
+    id: `prob-${Math.random().toString(36).substr(2, 9)}`,
+    organizationId: "default-org",
+    title: input.title,
+    description: input.description || null,
+    status: "investigating" as ProblemStatus,
+    rootCause: null,
+    workaround: null,
+    clientId: input.clientId || null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  problems.push(newProb);
+  localStorage.setItem("specdriven.problems", JSON.stringify(problems));
+  return {
+    ...newProb,
+    incidents: [],
+    changes: [],
+  };
+}
+
+export async function patchProblem(
+  id: string,
+  input: {
+    title?: string;
+    description?: string | null;
+    status?: ProblemStatus;
+    rootCause?: string | null;
+    workaround?: string | null;
+  }
+): Promise<Problem> {
+  initMocks();
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  const problems = JSON.parse(localStorage.getItem("specdriven.problems") || "[]") as any[];
+  const idx = problems.findIndex((x: any) => x.id === id);
+  if (idx === -1) throw new Error("Problem not found");
+
+  const updated = {
+    ...problems[idx],
+    ...input,
+    updatedAt: new Date().toISOString(),
+  };
+  problems[idx] = updated;
+  localStorage.setItem("specdriven.problems", JSON.stringify(problems));
+  
+  const full = await getProblem(id);
+  if (!full) throw new Error("Failed to reload problem");
+  return full;
+}
+
+export async function linkIncidentToProblem(problemId: string, ticketKey: string): Promise<void> {
+  initMocks();
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  const incs = JSON.parse(localStorage.getItem("specdriven.problem_incidents") || "[]") as any[];
+  const exists = incs.some((i: any) => i.problemId === problemId && i.ticketKey === ticketKey);
+  if (!exists) {
+    incs.push({ problemId, ticketKey });
+    localStorage.setItem("specdriven.problem_incidents", JSON.stringify(incs));
+  }
+}
+
+export async function unlinkIncidentFromProblem(problemId: string, ticketKey: string): Promise<void> {
+  initMocks();
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  let incs = JSON.parse(localStorage.getItem("specdriven.problem_incidents") || "[]") as any[];
+  incs = incs.filter((i: any) => !(i.problemId === problemId && i.ticketKey === ticketKey));
+  localStorage.setItem("specdriven.problem_incidents", JSON.stringify(incs));
+}
+
+export async function listChanges(): Promise<Change[]> {
+  initMocks();
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  const changes = JSON.parse(localStorage.getItem("specdriven.changes") || "[]") as any[];
+  return changes;
+}
+
+export async function getChange(id: string): Promise<Change | null> {
+  initMocks();
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  const changes = JSON.parse(localStorage.getItem("specdriven.changes") || "[]") as any[];
+  const c = changes.find((x: any) => x.id === id);
+  if (!c) return null;
+
+  let problem: Problem | null = null;
+  if (c.problemId) {
+    problem = await getProblem(c.problemId);
+  }
+
+  return {
+    ...c,
+    problem,
+  };
+}
+
+export async function createChange(input: {
+  title: string;
+  description?: string;
+  riskScore?: number;
+  rollbackPlan?: string;
+  windowStart?: string | null;
+  windowEnd?: string | null;
+  problemId?: string | null;
+}): Promise<Change> {
+  initMocks();
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  const changes = JSON.parse(localStorage.getItem("specdriven.changes") || "[]") as any[];
+  const newChange = {
+    id: `change-${Math.random().toString(36).substr(2, 9)}`,
+    organizationId: "default-org",
+    title: input.title,
+    description: input.description || null,
+    status: "draft" as ChangeStatus,
+    riskScore: input.riskScore || 1,
+    rollbackPlan: input.rollbackPlan || null,
+    windowStart: input.windowStart || null,
+    windowEnd: input.windowEnd || null,
+    cabDecision: null,
+    cabDecisionNote: null,
+    cabDecisionAt: null,
+    problemId: input.problemId || null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  changes.push(newChange);
+  localStorage.setItem("specdriven.changes", JSON.stringify(changes));
+  return newChange;
+}
+
+export async function patchChange(
+  id: string,
+  input: {
+    status?: ChangeStatus;
+    windowStart?: string | null;
+    windowEnd?: string | null;
+    riskScore?: number;
+    rollbackPlan?: string | null;
+    description?: string | null;
+    cabDecision?: string | null;
+    cabDecisionNote?: string | null;
+    cabDecisionAt?: string | null;
+  }
+): Promise<Change> {
+  initMocks();
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  const changes = JSON.parse(localStorage.getItem("specdriven.changes") || "[]") as any[];
+  const idx = changes.findIndex((x: any) => x.id === id);
+  if (idx === -1) throw new Error("Change not found");
+
+  const updated = {
+    ...changes[idx],
+    ...input,
+    updatedAt: new Date().toISOString(),
+  };
+  changes[idx] = updated;
+  localStorage.setItem("specdriven.changes", JSON.stringify(changes));
+  
+  const full = await getChange(id);
+  if (!full) throw new Error("Failed to reload change");
+  return full;
+}
+
+export async function submitChangeForApproval(id: string): Promise<Change> {
+  return patchChange(id, { status: "pending_approval" });
+}
+
+export async function decideCabChange(
+  id: string,
+  cabDecision: "approved" | "rejected",
+  note?: string
+): Promise<Change> {
+  return patchChange(id, {
+    status: cabDecision === "approved" ? "approved" : "rejected",
+    cabDecision,
+    cabDecisionNote: note || null,
+    cabDecisionAt: new Date().toISOString(),
+  });
+}
+
+// --- MOCK RISKS SYSTEM ---
+export interface Risk {
+  id: string;
+  organizationId: string;
+  title: string;
+  description: string | null;
+  probability: number; // 1-5
+  impact: number; // 1-5
+  status: "open" | "mitigated" | "avoided" | "transferred" | "accepted";
+  mitigationPlan: string | null;
+  problemId: string | null;
+  changeId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  problem?: Problem | null;
+  change?: Change | null;
+}
+
+const INITIAL_RISKS: Risk[] = [
+  {
+    id: "risk-1",
+    organizationId: "default-org",
+    title: "Indisponibilidade do banco de dados na migração",
+    description: "Risco de indisponibilidade prolongada durante a migração da CPU/RAM do banco de dados.",
+    probability: 2,
+    impact: 4,
+    status: "open",
+    mitigationPlan: "Executar a migração no domingo às 02:00 e testar restore de backup previamente.",
+    problemId: "prob-1",
+    changeId: "change-1",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: "risk-2",
+    organizationId: "default-org",
+    title: "Sobrecarga de chamados no go-live",
+    description: "Aumento expressivo no volume de chamados de suporte devido a dúvidas sobre o novo layout.",
+    probability: 4,
+    impact: 3,
+    status: "open",
+    mitigationPlan: "Escalar equipe de plantão para suporte nível 1 nas primeiras 48 horas.",
+    problemId: null,
+    changeId: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }
+];
+
+function initRiskMocks() {
+  if (!localStorage.getItem("specdriven.risks")) {
+    localStorage.setItem("specdriven.risks", JSON.stringify(INITIAL_RISKS));
+  }
+}
+
+export async function listRisks(): Promise<Risk[]> {
+  initRiskMocks();
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  const risks = JSON.parse(localStorage.getItem("specdriven.risks") || "[]") as Risk[];
+  const problems = JSON.parse(localStorage.getItem("specdriven.problems") || "[]") as Problem[];
+  const changes = JSON.parse(localStorage.getItem("specdriven.changes") || "[]") as Change[];
+
+  return risks.map((r) => ({
+    ...r,
+    problem: problems.find((p) => p.id === r.problemId) || null,
+    change: changes.find((c) => c.id === r.changeId) || null,
+  }));
+}
+
+export async function createRisk(input: {
+  title: string;
+  description?: string;
+  probability: number;
+  impact: number;
+  status?: Risk["status"];
+  mitigationPlan?: string;
+  problemId?: string | null;
+  changeId?: string | null;
+}): Promise<Risk> {
+  initRiskMocks();
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  const risks = JSON.parse(localStorage.getItem("specdriven.risks") || "[]") as Risk[];
+  const newRisk: Risk = {
+    id: `risk-${Math.random().toString(36).substr(2, 9)}`,
+    organizationId: "default-org",
+    title: input.title,
+    description: input.description || null,
+    probability: input.probability,
+    impact: input.impact,
+    status: input.status || "open",
+    mitigationPlan: input.mitigationPlan || null,
+    problemId: input.problemId || null,
+    changeId: input.changeId || null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  risks.push(newRisk);
+  localStorage.setItem("specdriven.risks", JSON.stringify(risks));
+  return newRisk;
+}
+
+export async function patchRisk(
+  id: string,
+  input: Partial<Pick<Risk, "title" | "description" | "probability" | "impact" | "status" | "mitigationPlan" | "problemId" | "changeId">>
+): Promise<Risk> {
+  initRiskMocks();
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  const risks = JSON.parse(localStorage.getItem("specdriven.risks") || "[]") as Risk[];
+  const idx = risks.findIndex((x) => x.id === id);
+  if (idx === -1) throw new Error("Risk not found");
+
+  const updated: Risk = {
+    ...risks[idx],
+    ...input,
+    updatedAt: new Date().toISOString(),
+  };
+  risks[idx] = updated;
+  localStorage.setItem("specdriven.risks", JSON.stringify(risks));
+
+  const problems = JSON.parse(localStorage.getItem("specdriven.problems") || "[]") as Problem[];
+  const changes = JSON.parse(localStorage.getItem("specdriven.changes") || "[]") as Change[];
+  return {
+    ...updated,
+    problem: problems.find((p) => p.id === updated.problemId) || null,
+    change: changes.find((c) => c.id === updated.changeId) || null,
+  };
+}
+

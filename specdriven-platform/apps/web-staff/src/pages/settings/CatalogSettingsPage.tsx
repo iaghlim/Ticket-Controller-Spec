@@ -13,9 +13,22 @@ import {
 import { ticketTypeLabel } from "../../lib/labels";
 import { TagsSection } from "../TagsPage";
 
-type Tab = "portal" | "tags";
+type Tab = "portal" | "tags" | "offerings";
+
+export interface ServiceOffering {
+  id: string;
+  name: string;
+  active: boolean;
+  updatedAt: string;
+}
 
 const MODULE_KEY_PATTERN = /^[a-z][a-z0-9_]{1,31}$/;
+
+const DEFAULT_OFFERINGS: ServiceOffering[] = [
+  { id: "offering-1", name: "Suporte Nível 1 - 8x5", active: true, updatedAt: new Date().toISOString() },
+  { id: "offering-2", name: "Suporte Premium - 24x7", active: true, updatedAt: new Date().toISOString() },
+  { id: "offering-3", name: "Consultoria Técnica Especializada", active: true, updatedAt: new Date().toISOString() },
+];
 
 export function CatalogSettingsPage() {
   const [tab, setTab] = useState<Tab>("portal");
@@ -32,6 +45,13 @@ export function CatalogSettingsPage() {
   const [savingModule, setSavingModule] = useState(false);
   const [deletingModuleId, setDeletingModuleId] = useState<string | null>(null);
 
+  // Service Offerings states
+  const [offerings, setOfferings] = useState<ServiceOffering[]>([]);
+  const [showOfferingForm, setShowOfferingForm] = useState(false);
+  const [editingOfferingId, setEditingOfferingId] = useState<string | null>(null);
+  const [offeringName, setOfferingName] = useState("");
+  const [offeringActive, setOfferingActive] = useState(true);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -43,6 +63,20 @@ export function CatalogSettingsPage() {
       setCanEdit(settingsRes.canEdit);
       setEnabledTypes(settingsRes.settings.enabledTicketTypes ?? [...TICKET_TYPES]);
       setModules(modulesRes.modules);
+
+      // Load offerings from localStorage
+      const savedOffs = localStorage.getItem("specdriven.service_offerings");
+      if (savedOffs) {
+        try {
+          setOfferings(JSON.parse(savedOffs));
+        } catch (err) {
+          setOfferings(DEFAULT_OFFERINGS);
+          localStorage.setItem("specdriven.service_offerings", JSON.stringify(DEFAULT_OFFERINGS));
+        }
+      } else {
+        setOfferings(DEFAULT_OFFERINGS);
+        localStorage.setItem("specdriven.service_offerings", JSON.stringify(DEFAULT_OFFERINGS));
+      }
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -57,6 +91,63 @@ export function CatalogSettingsPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  function saveOfferingsToLocalStorage(updatedList: ServiceOffering[]) {
+    setOfferings(updatedList);
+    localStorage.setItem("specdriven.service_offerings", JSON.stringify(updatedList));
+  }
+
+  function handleSaveOffering(e: FormEvent) {
+    e.preventDefault();
+    if (!offeringName.trim()) return;
+
+    let updatedList: ServiceOffering[];
+    if (editingOfferingId) {
+      updatedList = offerings.map((o) =>
+        o.id === editingOfferingId
+          ? { ...o, name: offeringName.trim(), active: offeringActive, updatedAt: new Date().toISOString() }
+          : o
+      );
+      setOk("Oferta de serviço atualizada com sucesso.");
+    } else {
+      const newOff: ServiceOffering = {
+        id: `offering-${Date.now()}`,
+        name: offeringName.trim(),
+        active: offeringActive,
+        updatedAt: new Date().toISOString(),
+      };
+      updatedList = [...offerings, newOff];
+      setOk("Oferta de serviço criada com sucesso.");
+    }
+    saveOfferingsToLocalStorage(updatedList);
+    resetOfferingForm();
+  }
+
+  function handleEditOffering(offering: ServiceOffering) {
+    setEditingOfferingId(offering.id);
+    setOfferingName(offering.name);
+    setOfferingActive(offering.active);
+    setShowOfferingForm(true);
+    setError(null);
+    setOk(null);
+  }
+
+  function handleDeleteOffering(id: string) {
+    if (!window.confirm("Deseja realmente excluir/retirar esta oferta de serviço?")) return;
+    const updatedList = offerings.filter((o) => o.id !== id);
+    saveOfferingsToLocalStorage(updatedList);
+    setOk("Oferta de serviço excluída.");
+    if (editingOfferingId === id) {
+      resetOfferingForm();
+    }
+  }
+
+  function resetOfferingForm() {
+    setEditingOfferingId(null);
+    setOfferingName("");
+    setOfferingActive(true);
+    setShowOfferingForm(false);
+  }
 
   function toggleType(type: TicketType) {
     if (!canEdit) return;
@@ -220,12 +311,21 @@ export function CatalogSettingsPage() {
         >
           Tags
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "offerings"}
+          className={`catalog-tab${tab === "offerings" ? " active" : ""}`}
+          onClick={() => setTab("offerings")}
+        >
+          Service Offerings
+        </button>
       </div>
 
       {error ? <p className="error">{error}</p> : null}
       {ok ? <p className="ok-banner">{ok}</p> : null}
 
-      {tab === "portal" ? (
+      {tab === "portal" && (
         <>
           <div className="panel">
             <h3 style={{ marginTop: 0 }}>Tipos de chamado habilitados</h3>
@@ -393,8 +493,118 @@ export function CatalogSettingsPage() {
             )}
           </div>
         </>
-      ) : (
+      )}
+
+      {tab === "tags" && (
         <TagsSection readOnly={!canEdit} />
+      )}
+
+      {tab === "offerings" && (
+        <>
+          {canEdit && (
+            <div className="panel" style={{ marginBottom: "1.5rem" }}>
+              <h3 style={{ marginTop: 0 }}>
+                {editingOfferingId ? "Editar Oferta de Serviço" : "Nova Oferta de Serviço"}
+              </h3>
+              <p className="muted">Defina as ofertas de serviços disponíveis para vinculação em chamados.</p>
+              <form onSubmit={handleSaveOffering} className="form form-spaced">
+                <div className="field">
+                  <label htmlFor="off-name">Nome da Oferta *</label>
+                  <input
+                    id="off-name"
+                    type="text"
+                    required
+                    value={offeringName}
+                    onChange={(e) => setOfferingName(e.target.value)}
+                    placeholder="Ex: Suporte Premium 24x7"
+                  />
+                </div>
+                <div className="field" style={{ flexDirection: "row", alignItems: "center", gap: "0.5rem" }}>
+                  <input
+                    id="off-active"
+                    type="checkbox"
+                    checked={offeringActive}
+                    onChange={(e) => setOfferingActive(e.target.checked)}
+                  />
+                  <label htmlFor="off-active" style={{ marginBottom: 0, cursor: "pointer" }}>
+                    Ativo (Disponível para seleção)
+                  </label>
+                </div>
+                <div className="form-actions">
+                  <button className="btn" type="submit">
+                    {editingOfferingId ? "Atualizar" : "Criar"}
+                  </button>
+                  {(editingOfferingId || showOfferingForm) && (
+                    <button type="button" className="btn btn-ghost" onClick={resetOfferingForm}>
+                      Cancelar
+                    </button>
+                  )}
+                </div>
+              </form>
+            </div>
+          )}
+
+          <div className="panel" style={{ padding: 0 }}>
+            <div className="panel-section-head">
+              <div>
+                <h3>Ofertas de Serviço</h3>
+                <p>{offerings.length} oferta(s) cadastrada(s)</p>
+              </div>
+            </div>
+            {offerings.length === 0 ? (
+              <p className="empty">Nenhuma oferta de serviço cadastrada.</p>
+            ) : (
+              <div className="data-table-wrap">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Nome da Oferta</th>
+                      <th>Status</th>
+                      <th>Última Atualização</th>
+                      {canEdit ? <th style={{ width: "200px" }} /> : null}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {offerings.map((off) => (
+                      <tr key={off.id}>
+                        <td style={{ fontWeight: 600 }}>{off.name}</td>
+                        <td>
+                          <span className={`settings-status-pill${off.active ? " ok" : " warn"}`}>
+                            {off.active ? "Ativo" : "Inativo"}
+                          </span>
+                        </td>
+                        <td className="table-meta">
+                          {new Date(off.updatedAt).toLocaleString("pt-BR")}
+                        </td>
+                        {canEdit ? (
+                          <td>
+                            <div className="table-actions">
+                              <button
+                                type="button"
+                                className="btn btn-ghost btn-sm"
+                                onClick={() => handleEditOffering(off)}
+                              >
+                                Editar
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-ghost btn-sm"
+                                style={{ color: "red" }}
+                                onClick={() => handleDeleteOffering(off.id)}
+                              >
+                                Excluir/Retirar
+                              </button>
+                            </div>
+                          </td>
+                        ) : null}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
       )}
     </div>
   );

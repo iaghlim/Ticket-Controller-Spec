@@ -8,6 +8,7 @@ import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 import { NewTicketPage } from "./pages/NewTicketPage";
 import { TicketDetailPage } from "./pages/TicketDetailPage";
 import { TicketsPage } from "./pages/TicketsPage";
+import { KnowledgePage } from "./pages/KnowledgePage";
 
 export function App() {
   return (
@@ -22,6 +23,7 @@ export function App() {
           <Route path="/tickets" element={<TicketsPage />} />
           <Route path="/tickets/new" element={<NewTicketPage />} />
           <Route path="/tickets/:key" element={<TicketDetailPage />} />
+          <Route path="/knowledge" element={<KnowledgePage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

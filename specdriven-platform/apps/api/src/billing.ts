@@ -46,14 +46,7 @@ export async function patchClientBillingHandler(
 
     const client = await prisma.client.update({
       where: { id },
-      data: {
-        ...(parsed.data.baselineHoursMonth !== undefined
-          ? { baselineHoursMonth: parsed.data.baselineHoursMonth }
-          : {}),
-        ...(parsed.data.hourlyRateCents !== undefined
-          ? { hourlyRateCents: parsed.data.hourlyRateCents }
-          : {}),
-      },
+      data: {},
     });
 
     await writeAudit({
@@ -172,7 +165,13 @@ export async function billingSummaryHandler(
       },
       include: {
         user: { select: { id: true, name: true, hourRateFactor: true } },
-        ticket: { select: { key: true, ticketType: true } },
+        ticket: {
+          select: {
+            key: true,
+            ticketType: true,
+            project: { select: { hourlyRateCents: true } },
+          },
+        },
       },
     });
 
@@ -183,13 +182,12 @@ export async function billingSummaryHandler(
       { userId: string; name: string; seconds: number; costCents: number }
     > = {};
 
-    const baseRate = client.hourlyRateCents ?? 0;
-
     for (const e of entries) {
       const sec = e.seconds ?? 0;
       secondsBaseline += sec;
       const hours = sec / 3600;
       const factor = e.user.hourRateFactor ?? 1;
+      const baseRate = e.ticket.project?.hourlyRateCents ?? 0;
       const cost = Math.round(hours * baseRate * factor);
       costCentsInternal += cost;
       const bucket = byUser[e.userId] ?? {
@@ -204,14 +202,20 @@ export async function billingSummaryHandler(
     }
 
     const hoursUsed = secondsBaseline / 3600;
-    const baseline = client.baselineHoursMonth ?? null;
+    const clientProjects = await prisma.project.findMany({
+      where: { clientId: client.id, organizationId: user.organizationId },
+    });
+    const baseline = clientProjects.reduce((sum, p) => sum + (p.baselineHoursMonth ?? 0), 0);
+    const avgHourlyRate = clientProjects.length > 0
+      ? Math.round(clientProjects.reduce((sum, p) => sum + (p.hourlyRateCents ?? 0), 0) / clientProjects.length)
+      : 0;
 
     return {
       client: {
         id: client.id,
         name: client.name,
-        baselineHoursMonth: baseline,
-        hourlyRateCents: client.hourlyRateCents,
+        baselineHoursMonth: baseline || null,
+        hourlyRateCents: avgHourlyRate || null,
       },
       range: {
         from: query.data.from.toISOString(),

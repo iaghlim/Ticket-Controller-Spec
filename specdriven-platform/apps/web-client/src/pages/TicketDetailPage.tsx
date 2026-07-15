@@ -13,6 +13,9 @@ import {
   listComments,
   listTicketTags,
   uploadAttachment,
+  submitTicketFeedback,
+  approveApproval,
+  rejectApproval,
   type TicketSla,
 } from "../lib/api";
 import {
@@ -44,6 +47,15 @@ export function TicketDetailPage() {
   const [posting, setPosting] = useState(false);
   const [attaching, setAttaching] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const [rating, setRating] = useState<number>(0);
+  const [comment, setComment] = useState<string>("");
+  const [feedbackSuccess, setFeedbackSuccess] = useState<boolean>(false);
+  const [submittingFeedback, setSubmittingFeedback] = useState<boolean>(false);
+
+  const [decidingApprovalId, setDecidingApprovalId] = useState<string | null>(null);
+  const [approvalDecisionNote, setApprovalDecisionNote] = useState<string>("");
+  const [decisionError, setDecisionError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!key) return;
@@ -275,6 +287,275 @@ export function TicketDetailPage() {
           </dl>
         </div>
       ) : null}
+
+      {/* Card de Aprovações Pendentes */}
+      {ticket && (() => {
+        const ticketWithApprovals = ticket as any;
+        const pendingApprovals = ticketWithApprovals.approvalRequests?.filter(
+          (req: any) => req.status === "pending"
+        ) || [];
+        if (pendingApprovals.length === 0) return null;
+
+        return (
+          <div
+            className="panel"
+            style={{
+              border: "2px solid var(--warning)",
+              background: "rgba(234, 179, 8, 0.05)",
+              padding: "1.5rem",
+              marginBottom: "1rem",
+              borderRadius: "var(--radius-lg)"
+            }}
+          >
+            <div style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start", marginBottom: "1rem" }}>
+              <span style={{ fontSize: "1.75rem", marginTop: "-2px" }}>🔔</span>
+              <div>
+                <h3 style={{ margin: 0, fontSize: "1.15rem", fontWeight: 700, color: "var(--warning)" }}>
+                  Solicitação de Aprovação Pendente
+                </h3>
+                <p className="muted" style={{ margin: "4px 0 0", fontSize: "0.9rem" }}>
+                  Este chamado requer a sua aprovação para prosseguir.
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              {pendingApprovals.map((approval: any) => {
+                let label = "Solicitação de aprovação.";
+                if (approval.kind === "ticket") {
+                  label = `Aprovação para alteração de status do chamado para: ${statusLabel(approval.targetStatus)}`;
+                } else if (approval.kind === "hour_limit") {
+                  label = `Aprovação de novo limite de horas de atendimento: ${approval.requestedMinutes} minutos.`;
+                } else if (approval.kind === "time_entry") {
+                  label = `Aprovação de apontamento de horas excedente.`;
+                } else if (approval.kind === "change") {
+                  label = `Aprovação de Mudança/Janela técnica.`;
+                }
+
+                return (
+                  <div
+                    key={approval.id}
+                    style={{
+                      border: "1px solid var(--border)",
+                      borderRadius: "var(--radius-sm)",
+                      padding: "1.5rem",
+                      background: "var(--bg)"
+                    }}
+                  >
+                    <p style={{ fontWeight: 600, margin: "0 0 8px" }}>{label}</p>
+                    {approval.reason && (
+                      <div
+                        style={{
+                          fontStyle: "italic",
+                          fontSize: "0.9rem",
+                          padding: "0.5rem 0.75rem",
+                          background: "var(--bg-soft)",
+                          borderLeft: "3px solid var(--warning)",
+                          marginBottom: "1rem",
+                          borderRadius: "var(--radius-sm)"
+                        }}
+                      >
+                        Justificativa: "{approval.reason}"
+                      </div>
+                    )}
+
+                    {decisionError && decidingApprovalId === approval.id && (
+                      <div className="alert alert-error" style={{ marginBottom: "1rem" }}>
+                        {decisionError}
+                      </div>
+                    )}
+
+                    <div className="field" style={{ marginBottom: "1rem" }}>
+                      <label htmlFor={`decision-note-${approval.id}`}>
+                        Nota / Comentário da sua decisão (opcional)
+                      </label>
+                      <input
+                        id={`decision-note-${approval.id}`}
+                        type="text"
+                        placeholder="Ex: Aprovado conforme alinhado..."
+                        value={decidingApprovalId === approval.id ? approvalDecisionNote : ""}
+                        onChange={(e) => {
+                          setDecidingApprovalId(approval.id);
+                          setApprovalDecisionNote(e.target.value);
+                        }}
+                        style={{ width: "100%" }}
+                      />
+                    </div>
+
+                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                      <button
+                        className="btn"
+                        style={{ background: "#22c55e", color: "white" }}
+                        onClick={async () => {
+                          setDecidingApprovalId(approval.id);
+                          setDecisionError(null);
+                          try {
+                            await approveApproval(approval.id, approvalDecisionNote.trim() || null);
+                            setApprovalDecisionNote("");
+                            setDecidingApprovalId(null);
+                            await load();
+                          } catch (err) {
+                            setDecisionError(
+                              err instanceof ApiError ? err.message : "Erro ao aprovar solicitação."
+                            );
+                          }
+                        }}
+                      >
+                        Aprovar
+                      </button>
+                      <button
+                        className="btn btn-ghost"
+                        style={{ border: "1px solid #ef4444", color: "#ef4444" }}
+                        onClick={async () => {
+                          setDecidingApprovalId(approval.id);
+                          setDecisionError(null);
+                          try {
+                            await rejectApproval(approval.id, approvalDecisionNote.trim() || null);
+                            setApprovalDecisionNote("");
+                            setDecidingApprovalId(null);
+                            await load();
+                          } catch (err) {
+                            setDecisionError(
+                              err instanceof ApiError ? err.message : "Erro ao rejeitar solicitação."
+                            );
+                          }
+                        }}
+                      >
+                        Reprovar
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
+      {ticket && ticket.status === "concluido" && (
+        <div className="panel" style={{ border: "1px solid var(--border)", background: "var(--bg-soft)" }}>
+          {ticket.csatScore === null ? (
+            feedbackSuccess ? (
+              <div style={{ textAlign: "center", padding: "1.5rem 1rem" }}>
+                <span style={{ fontSize: "2rem" }}>✨</span>
+                <h3 style={{ margin: "0.5rem 0", fontSize: "1.1rem", color: "var(--ok)" }}>Obrigado pelo seu feedback!</h3>
+                <p className="muted" style={{ margin: 0 }}>Sua opinião é muito importante para melhorarmos nossos serviços.</p>
+              </div>
+            ) : (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (rating === 0) {
+                    alert("Por favor, selecione uma nota de 1 a 5 estrelas.");
+                    return;
+                  }
+                  setSubmittingFeedback(true);
+                  try {
+                    const res = await submitTicketFeedback(key, {
+                      csatScore: rating,
+                      csatComment: comment.trim() || null,
+                    });
+                    setFeedbackSuccess(true);
+                    setTicket(res.ticket);
+                  } catch (err) {
+                    alert(err instanceof ApiError ? err.message : "Erro ao enviar feedback.");
+                  } finally {
+                    setSubmittingFeedback(false);
+                  }
+                }}
+                className="form form-spaced"
+                style={{ padding: "0.5rem" }}
+              >
+                <div className="panel-head" style={{ marginBottom: "1rem" }}>
+                  <h2 style={{ fontSize: "1.1rem", fontWeight: 700, margin: 0 }}>Avaliar Atendimento</h2>
+                  <p className="muted" style={{ fontSize: "0.8rem", margin: "4px 0 0" }}>
+                    Por favor, avalie sua experiência com este chamado.
+                  </p>
+                </div>
+
+                <div className="field">
+                  <span style={{ fontSize: "0.9rem", fontWeight: 500, display: "block", marginBottom: "0.5rem" }}>
+                    Sua nota:
+                  </span>
+                  <div style={{ display: "flex", gap: "0.5rem" }}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setRating(star)}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                          fontSize: "2rem",
+                          padding: 0,
+                          color: star <= rating ? "#eab308" : "#d1d5db",
+                          transition: "color 0.2s ease",
+                        }}
+                      >
+                        ★
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="field">
+                  <label htmlFor="csat-comment">Comentário opcional</label>
+                  <textarea
+                    id="csat-comment"
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    placeholder="Conte-nos o que achou do atendimento..."
+                    rows={3}
+                  />
+                </div>
+
+                <button className="btn" type="submit" disabled={submittingFeedback || rating === 0}>
+                  {submittingFeedback ? "Enviando…" : "Enviar Avaliação"}
+                </button>
+              </form>
+            )
+          ) : (
+            <div style={{ padding: "0.5rem" }}>
+              <div className="panel-head" style={{ marginBottom: "1rem" }}>
+                <h2 style={{ fontSize: "1.1rem", fontWeight: 700, margin: 0 }}>Sua Avaliação</h2>
+                <p className="muted" style={{ fontSize: "0.8rem", margin: "4px 0 0" }}>
+                  Obrigado por avaliar este chamado.
+                </p>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                <div style={{ display: "flex", gap: "0.25rem" }}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <span
+                      key={star}
+                      style={{
+                        fontSize: "1.5rem",
+                        color: star <= (ticket.csatScore ?? 0) ? "#eab308" : "#d1d5db",
+                      }}
+                    >
+                      ★
+                    </span>
+                  ))}
+                </div>
+                {ticket.csatComment ? (
+                  <div
+                    style={{
+                      fontStyle: "italic",
+                      background: "var(--bg-muted)",
+                      padding: "0.75rem",
+                      borderRadius: "var(--radius-sm)",
+                      borderLeft: "4px solid var(--accent)",
+                      color: "var(--text)",
+                    }}
+                  >
+                    "{ticket.csatComment}"
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="panel">
         <div className="panel-head">

@@ -22,6 +22,7 @@ const KIND_LABEL: Record<ApprovalKind, string> = {
   ticket: "Chamado",
   hour_limit: "Limite de horas",
   time_entry: "Lançamento de horas",
+  change: "Mudança",
 };
 
 const STATUS_LABEL: Record<ApprovalStatus, string> = {

@@ -46,7 +46,7 @@ export function canManageClients(user: AuthUser): boolean {
 }
 
 export function canManageProjects(user: AuthUser): boolean {
-  return user.role === "master" || user.role === "admin";
+  return user.role === "master" || user.role === "admin" || user.role === "gestor";
 }
 
 export function canInvite(user: AuthUser, targetRole: UserRole): boolean {

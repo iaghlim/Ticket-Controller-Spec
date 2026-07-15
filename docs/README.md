@@ -10,6 +10,7 @@
 | **[Configurações da consultoria](settings.md)** | Hub `/settings` |
 | **[Checklist go-live](go-live-checklist.md)** | Deploy P0–P2 |
 | **[Segurança](security.md)** | Auth, secrets, JWT |
+| **[Diagnóstico ITIL v5](itil-v5-diagnostico.md)** | Mapa de cobertura + roadmap · versão visual: [HTML](itil-v5-diagnostico.html) |
 
 ## Funcional — plataforma cloud
 

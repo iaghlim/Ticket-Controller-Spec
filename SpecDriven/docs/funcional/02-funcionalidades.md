@@ -35,6 +35,7 @@ Capacidades do produto, alinhadas ao README (F01–F14) e às extensões já pre
 | **Tema** | system / light / dark nas configurações |
 | **Relatório de chamados** | Lista filtrável (abertos, status, cliente) |
 | **Dashboard** | Contagens, recentes, breakdown de horas da semana |
+| **Modo Cloud (Sync)** | Configuração de login na cloud, sincronização incremental pull/push e upload automático de documentos gerados (Fase D) |
 
 ## Status e prioridade
 

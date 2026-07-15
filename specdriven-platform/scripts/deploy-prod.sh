@@ -15,6 +15,9 @@ npm ci
 echo "==> prisma migrate deploy"
 npm run db:migrate:deploy
 
+# Nota: Em uma primeira implantação em banco limpo, execute 'npm run db:bootstrap' 
+# para provisionar o usuário master administrador inicial da plataforma.
+
 echo "==> docker build + up (com storage)"
 docker compose -f docker-compose.prod.yml build
 docker compose -f docker-compose.prod.yml --profile storage up -d

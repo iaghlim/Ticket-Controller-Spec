@@ -2,6 +2,7 @@ import type {
   Attachment,
   Comment,
   PortalSettings,
+  Project,
   SlaState,
   Tag,
   Ticket,
@@ -28,6 +29,7 @@ export type LoginResponse = {
   token: string;
   user: AuthUser;
   mode: string;
+  csrfToken?: string;
 };
 
 export class ApiError extends Error {
@@ -40,6 +42,16 @@ export class ApiError extends Error {
     this.status = status;
     this.body = body;
   }
+}
+
+let csrfToken: string | null = null;
+
+export function getCsrfToken(): string | null {
+  return csrfToken;
+}
+
+export function setCsrfToken(token: string | null): void {
+  csrfToken = token;
 }
 
 export function getStoredToken(): string | null {
@@ -57,11 +69,16 @@ async function request<T>(
 ): Promise<T> {
   const { token, headers, ...rest } = options;
   const auth = token === undefined ? getStoredToken() : token;
+  const method = (rest.method ?? "GET").toUpperCase();
+  const isMutation = ["POST", "PATCH", "PUT", "DELETE"].includes(method);
+
   const res = await fetch(`${apiBaseUrl}${path}`, {
     ...rest,
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       ...(auth ? { Authorization: `Bearer ${auth}` } : {}),
+      ...(isMutation && csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
       ...headers,
     },
   });
@@ -73,6 +90,13 @@ async function request<T>(
       body = JSON.parse(text) as unknown;
     } catch {
       body = text;
+    }
+  }
+
+  if (res.ok && body && typeof body === "object") {
+    const maybeToken = (body as Record<string, unknown>).csrfToken;
+    if (typeof maybeToken === "string") {
+      setCsrfToken(maybeToken);
     }
   }
 
@@ -88,12 +112,26 @@ async function request<T>(
   return body as T;
 }
 
-export function login(email: string, password: string) {
-  return request<LoginResponse>("/auth/login", {
+export async function login(email: string, password: string) {
+  const res = await request<LoginResponse>("/auth/login", {
     method: "POST",
     body: JSON.stringify({ email, password }),
     token: null,
   });
+  if (res && res.csrfToken) {
+    setCsrfToken(res.csrfToken);
+  }
+  return res;
+}
+
+export function logout() {
+  return request<{ ok: boolean }>("/auth/logout", {
+    method: "POST",
+  }).catch(() => ({ ok: false }))
+    .finally(() => {
+      setStoredToken(null);
+      setCsrfToken(null);
+    });
 }
 
 export function forgotPassword(email: string) {
@@ -163,6 +201,7 @@ export function getPlatformMeta() {
 export function createTicket(input: {
   title: string;
   clientId: string;
+  projectId: string;
   description?: string;
   ticketType?: TicketType;
   companyName?: string;
@@ -222,7 +261,11 @@ export async function uploadAttachment(
     `${apiBaseUrl}/tickets/${encodeURIComponent(key)}/attachments`,
     {
       method: "POST",
-      headers: auth ? { Authorization: `Bearer ${auth}` } : {},
+      credentials: "include",
+      headers: {
+        ...(auth ? { Authorization: `Bearer ${auth}` } : {}),
+        ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
+      },
       body: form,
     },
   );
@@ -327,4 +370,50 @@ export function listTicketTags(key: string) {
   return request<{ tags: Tag[] }>(
     `/tickets/${encodeURIComponent(key)}/tags`,
   );
+}
+
+export function submitTicketFeedback(
+  key: string,
+  input: { csatScore: number; csatComment?: string | null }
+) {
+  return request<{ ticket: Ticket }>(
+    `/tickets/${encodeURIComponent(key)}/feedback`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    }
+  );
+}
+
+export function approveApproval(id: string, decisionNote?: string | null) {
+  return request<{ approval: any }>(`/approvals/${id}/approve`, {
+    method: "POST",
+    body: JSON.stringify({ decisionNote: decisionNote ?? null }),
+  });
+}
+
+export function rejectApproval(id: string, decisionNote?: string | null) {
+  return request<{ approval: any }>(`/approvals/${id}/reject`, {
+    method: "POST",
+    body: JSON.stringify({ decisionNote: decisionNote ?? null }),
+  });
+}
+
+
+export type UserProjectLink = {
+  id: string;
+  userId: string;
+  projectId: string;
+  active: boolean;
+  project?: { id: string; name: string; code: string; clientId: string };
+};
+
+export function listUserProjects(userId?: string) {
+  const qs = userId ? ?userId= : '';
+  return request<{ links: UserProjectLink[] }>(/user-projects);
+}
+
+export function listProjects(clientId?: string) {
+  const q = clientId ? `?clientId=${encodeURIComponent(clientId)}` : "";
+  return request<{ projects: Project[] }>(`/projects${q}`);
 }

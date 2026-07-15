@@ -9,7 +9,6 @@ import {
   type NotificationRow,
 } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { NOT_CONFIGURED } from "../lib/labels";
 import { formatDate } from "../lib/labels";
 import { useClientContext } from "../lib/useClientContext";
 import { usePortalSettings } from "../lib/usePortalSettings";
@@ -255,10 +254,6 @@ export function AppLayout() {
   }, [location.pathname]);
 
   const displayName = clientName || user?.name || user?.email || "Cliente";
-  const kbUrl =
-    portalSettings?.knowledgeBaseEnabled && portalSettings.knowledgeBaseUrl
-      ? portalSettings.knowledgeBaseUrl
-      : null;
 
   return (
     <div className="client-layout">
@@ -312,20 +307,15 @@ export function AppLayout() {
             >
               Meus chamados
             </NavLink>
-            {kbUrl ? (
-              <a
-                href={kbUrl}
-                className="client-nav-link"
-                target="_blank"
-                rel="noopener noreferrer"
+            {portalSettings?.knowledgeBaseEnabled && (
+              <NavLink
+                to="/knowledge"
+                className={({ isActive }) =>
+                  `client-nav-link${isActive ? " active" : ""}`
+                }
               >
                 Base de conhecimento
-              </a>
-            ) : (
-              <span className="client-nav-link client-nav-unconfigured">
-                Base de conhecimento
-                <small className="unconfigured-label">{NOT_CONFIGURED}</small>
-              </span>
+              </NavLink>
             )}
             <button
               type="button"

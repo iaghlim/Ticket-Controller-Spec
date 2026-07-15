@@ -115,6 +115,7 @@ export async function listApprovalsHandler(
         requester: { select: { id: true, name: true, email: true, role: true } },
         reviewer: { select: { id: true, name: true, email: true, role: true } },
         timeEntry: true,
+        change: { select: { id: true, title: true, status: true } },
       },
       orderBy: { createdAt: "desc" },
       take: 200,
@@ -289,10 +290,6 @@ async function decideApproval(
   const user = await requireAuth(request, reply);
   if (!user) return;
 
-  if (user.role !== "gestor") {
-    return reply.status(403).send({ error: "forbidden_gestor_only" });
-  }
-
   if (user.organizationId === "dev-org") {
     return reply.status(503).send({
       error: "database_required",
@@ -325,6 +322,17 @@ async function decideApproval(
     if (!approval) {
       return reply.status(404).send({ error: "not_found" });
     }
+
+    if (user.role !== "gestor") {
+      if (user.role === "cliente") {
+        if (!approval.ticketId || !approval.ticket || approval.ticket.clientId !== user.clientId) {
+          return reply.status(403).send({ error: "forbidden" });
+        }
+      } else {
+        return reply.status(403).send({ error: "forbidden_gestor_only" });
+      }
+    }
+
     if (approval.status !== "pending") {
       return reply.status(409).send({
         error: "approval_not_pending",
@@ -352,7 +360,7 @@ async function decideApproval(
       });
 
       if (decision === "approved") {
-        if (approval.kind === "ticket" && approval.targetStatus) {
+        if (approval.kind === "ticket" && approval.targetStatus && approval.ticketId) {
           await tx.ticket.update({
             where: { id: approval.ticketId },
             data: { status: approval.targetStatus },
@@ -360,7 +368,8 @@ async function decideApproval(
         }
         if (
           approval.kind === "hour_limit" &&
-          approval.requestedMinutes != null
+          approval.requestedMinutes != null &&
+          approval.ticketId
         ) {
           await tx.ticket.update({
             where: { id: approval.ticketId },
@@ -373,11 +382,25 @@ async function decideApproval(
             data: { approvalStatus: "approved" },
           });
         }
-      } else if (approval.kind === "time_entry" && approval.timeEntryId) {
-        await tx.timeEntry.update({
-          where: { id: approval.timeEntryId },
-          data: { approvalStatus: "rejected" },
-        });
+        if (approval.kind === "change" && approval.changeId) {
+          await tx.change.update({
+            where: { id: approval.changeId },
+            data: { status: "approved" },
+          });
+        }
+      } else {
+        if (approval.kind === "time_entry" && approval.timeEntryId) {
+          await tx.timeEntry.update({
+            where: { id: approval.timeEntryId },
+            data: { approvalStatus: "rejected" },
+          });
+        }
+        if (approval.kind === "change" && approval.changeId) {
+          await tx.change.update({
+            where: { id: approval.changeId },
+            data: { status: "rejected" },
+          });
+        }
       }
 
       return decided;

@@ -717,6 +717,14 @@ export async function portalSettingsHandler(
     );
     const logoUrl = await resolveLogoUrl(settings.logoStorageKey);
 
+    const activeOfferings = await prisma.serviceOffering.findMany({
+      where: {
+        organizationId: org.id,
+        status: "active",
+      },
+      orderBy: { name: "asc" },
+    });
+
     return {
       organizationName: org.name,
       supportEmail: settings.supportEmail,
@@ -733,6 +741,7 @@ export async function portalSettingsHandler(
         settings.knowledgeBaseEnabled && settings.knowledgeBaseUrl
           ? settings.knowledgeBaseUrl
           : null,
+      serviceOfferings: activeOfferings,
     };
   } catch (err) {
     if (isDbUnavailableError(err)) return dbUnavailable(reply);

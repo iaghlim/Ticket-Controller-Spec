@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual, randomUUID } from "node:crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
@@ -40,6 +40,7 @@ type TokenPayload = {
   exp: number;
   homeOrganizationId?: string;
   isPlatformContext?: boolean;
+  csrfToken?: string;
 };
 
 const SwitchOrgBodySchema = z.object({
@@ -113,7 +114,7 @@ function b64url(input: Buffer | string): string {
     .replace(/\//g, "_");
 }
 
-function signToken(user: AuthUser, ttlSeconds = 60 * 60 * 12): string {
+export function signToken(user: AuthUser, ttlSeconds = 60 * 60 * 12, csrfToken?: string): string {
   const header = b64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
   const payload: TokenPayload = {
     sub: user.id,
@@ -123,6 +124,7 @@ function signToken(user: AuthUser, ttlSeconds = 60 * 60 * 12): string {
     clientId: user.clientId,
     name: user.name,
     exp: Math.floor(Date.now() / 1000) + ttlSeconds,
+    csrfToken,
     ...(user.role === "master"
       ? {
           homeOrganizationId: user.homeOrganizationId ?? user.organizationId,
@@ -194,8 +196,23 @@ export async function loginHandler(
       organizationName: "Blend IT",
       clientId: null,
     };
+    const csrfToken = "dev-csrf-token";
+
+    const isProd = process.env.NODE_ENV === "production";
+    const cookieParts = [
+      `token=${DEV_TOKEN}`,
+      "HttpOnly",
+      "SameSite=Strict",
+      "Path=/",
+    ];
+    if (isProd) {
+      cookieParts.push("Secure");
+    }
+    reply.header("Set-Cookie", cookieParts.join("; "));
+
     return {
       token: DEV_TOKEN,
+      csrfToken,
       user,
       mode: "dev_bypass" as const,
     };
@@ -213,8 +230,24 @@ export async function loginHandler(
       return reply.status(401).send({ error: "invalid_credentials" });
     }
     const user = await toAuthUser(dbUser);
+    const csrfToken = randomUUID();
+    const token = signToken(user, undefined, csrfToken);
+
+    const isProd = process.env.NODE_ENV === "production";
+    const cookieParts = [
+      `token=${token}`,
+      "HttpOnly",
+      "SameSite=Strict",
+      "Path=/",
+    ];
+    if (isProd) {
+      cookieParts.push("Secure");
+    }
+    reply.header("Set-Cookie", cookieParts.join("; "));
+
     return {
-      token: signToken(user),
+      token,
+      csrfToken,
       user,
       mode: "db" as const,
     };
@@ -294,8 +327,24 @@ export async function switchOrgHandler(
       organizationId: parsed.data.organizationId,
       isPlatformContext: false,
     });
+    const nextCsrfToken = (request as any).csrfTokenInJwt || randomUUID();
+    const nextToken = signToken(nextUser, undefined, nextCsrfToken);
+
+    const isProd = process.env.NODE_ENV === "production";
+    const cookieParts = [
+      `token=${nextToken}`,
+      "HttpOnly",
+      "SameSite=Strict",
+      "Path=/",
+    ];
+    if (isProd) {
+      cookieParts.push("Secure");
+    }
+    reply.header("Set-Cookie", cookieParts.join("; "));
+
     return {
-      token: signToken(nextUser),
+      token: nextToken,
+      csrfToken: nextCsrfToken,
       user: nextUser,
     };
   } catch (err) {
@@ -342,8 +391,24 @@ export async function exitOrgHandler(
       organizationId: homeOrganizationId,
       isPlatformContext: true,
     });
+    const nextCsrfToken = (request as any).csrfTokenInJwt || randomUUID();
+    const nextToken = signToken(nextUser, undefined, nextCsrfToken);
+
+    const isProd = process.env.NODE_ENV === "production";
+    const cookieParts = [
+      `token=${nextToken}`,
+      "HttpOnly",
+      "SameSite=Strict",
+      "Path=/",
+    ];
+    if (isProd) {
+      cookieParts.push("Secure");
+    }
+    reply.header("Set-Cookie", cookieParts.join("; "));
+
     return {
-      token: signToken(nextUser),
+      token: nextToken,
+      csrfToken: nextCsrfToken,
       user: nextUser,
     };
   } catch (err) {
@@ -360,12 +425,35 @@ export async function exitOrgHandler(
 export async function resolveAuthUser(
   request: FastifyRequest,
 ): Promise<AuthUser | null> {
-  const header = request.headers.authorization;
-  if (!header?.startsWith("Bearer ")) return null;
-  const token = header.slice("Bearer ".length).trim();
+  let token: string | null = null;
+  let loadedFromCookie = false;
+
+  // Prefer Authorization header over cookie to avoid CSRF when both are present.
+  const authHeader = request.headers.authorization;
+  if (authHeader?.startsWith("Bearer ")) {
+    token = authHeader.slice("Bearer ".length).trim();
+  }
+
+  if (!token) {
+    const cookieHeader = request.headers.cookie;
+    if (cookieHeader) {
+      const cookies = cookieHeader.split(";");
+      for (const cookie of cookies) {
+        const [name, value] = cookie.trim().split("=");
+        if (name === "token" && value) {
+          token = value;
+          loadedFromCookie = true;
+          break;
+        }
+      }
+    }
+  }
+
   if (!token) return null;
 
   if (isDevAuthBypass() && token === DEV_TOKEN) {
+    (request as any).tokenLoadedFromCookie = loadedFromCookie;
+    (request as any).csrfTokenInJwt = "dev-csrf-token";
     return {
       id: "dev-user",
       email: "dev@specdriven.local",
@@ -379,6 +467,10 @@ export async function resolveAuthUser(
 
   const payload = verifyToken(token);
   if (!payload) return null;
+
+  (request as any).tokenLoadedFromCookie = loadedFromCookie;
+  (request as any).csrfTokenInJwt = payload.csrfToken;
+
   const masterFields =
     payload.role === "master"
       ? masterSessionFields(payload.role, payload.organizationId, {
@@ -398,7 +490,6 @@ export async function resolveAuthUser(
     ...masterFields,
   };
 }
-
 export async function requireAuth(
   request: FastifyRequest,
   reply: FastifyReply,
@@ -408,5 +499,19 @@ export async function requireAuth(
     await reply.status(401).send({ error: "unauthorized" });
     return null;
   }
+
+  const loadedFromCookie = (request as any).tokenLoadedFromCookie;
+  if (loadedFromCookie) {
+    const method = request.method.toUpperCase();
+    if (["POST", "PATCH", "DELETE", "PUT"].includes(method)) {
+      const csrfHeader = request.headers["x-csrf-token"];
+      const csrfTokenInJwt = (request as any).csrfTokenInJwt;
+      if (!csrfTokenInJwt || csrfHeader !== csrfTokenInJwt) {
+        await reply.status(403).send({ error: "forbidden_csrf_invalid" });
+        return null;
+      }
+    }
+  }
+
   return user;
 }

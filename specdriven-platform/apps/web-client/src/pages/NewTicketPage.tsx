@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { TICKET_TYPES, type TicketType } from "@specdriven/shared";
+import { TICKET_TYPES, type Project, type TicketType } from "@specdriven/shared";
 import {
   ApiError,
   createAttachmentMeta,
   createTicket,
   getPlatformMeta,
-  listClients,
+  listProjects,
   uploadAttachment,
 } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -38,9 +38,10 @@ export function NewTicketPage() {
     [portalSettings],
   );
 
-  const [companyName, setCompanyName] = useState("");
   const [ticketType, setTicketType] = useState<TicketType>("melhoria");
   const [module, setModule] = useState("geral");
+  const [projectId, setProjectId] = useState("");
+  const [projects, setProjects] = useState<Project[]>([]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -48,6 +49,11 @@ export function NewTicketPage() {
   const [loadingMeta, setLoadingMeta] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [serviceOffering, setServiceOffering] = useState("");
+
+  const activeOfferings = useMemo(() => {
+    return (portalSettings?.serviceOfferings ?? []).filter((o) => o.active);
+  }, [portalSettings]);
 
   useEffect(() => {
     if (enabledTypes.length === 0) return;
@@ -71,14 +77,9 @@ export function NewTicketPage() {
     async function load() {
       setLoadingMeta(true);
       try {
-        const [meta, clientsRes] = await Promise.all([
-          getPlatformMeta(),
-          listClients(),
-        ]);
+        const meta = await getPlatformMeta();
         if (!cancelled) {
           setStorageConfigured(Boolean(meta.flags?.storageConfigured));
-          const client = clientsRes.clients[0];
-          if (client?.name) setCompanyName(client.name);
         }
       } catch {
         /* defaults ok */
@@ -92,6 +93,50 @@ export function NewTicketPage() {
     };
   }, []);
 
+  // Carrega projetos do cliente (do user.clientId) ao montar
+  // Carrega projetos do usuário: vínculos explícitos primeiro, senão todos do cliente
+  useEffect(() => {
+    let cancelled = false;
+    async function loadProjects() {
+      const uid = user?.id;
+      const cid = user?.clientId;
+      if (!uid) return;
+      try {
+        // Check for explicit user-project links first
+        const linksRes = await listUserProjects(uid);
+        const linkedProjects = linksRes.links
+          .filter((l) => l.active && l.project)
+          .map((l) => l.project!);
+        if (linkedProjects.length > 0) {
+          if (!cancelled) {
+            setProjects(linkedProjects);
+            if (linkedProjects.length > 0 && !projectId) {
+              setProjectId(linkedProjects[0]!.id);
+            }
+          }
+          return;
+        }
+        // Fallback: all projects from the client
+        if (!cid) return;
+        const res = await listProjects(cid);
+        if (!cancelled) {
+          const list = res.projects ?? [];
+          setProjects(list);
+          if (list.length > 0 && !projectId) {
+            setProjectId(list[0]!.id);
+          }
+        }
+      } catch {
+        /* ignore — exibe vazio */
+      }
+    }
+    void loadProjects();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, user?.clientId]);
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
@@ -102,15 +147,24 @@ export function NewTicketPage() {
       );
       return;
     }
+    if (!projectId) {
+      setError("Selecione um projeto.");
+      return;
+    }
 
     setSubmitting(true);
     try {
+      let finalDescription = description.trim();
+      if (serviceOffering) {
+        finalDescription += `\n\n**Oferta de Serviço:** ${serviceOffering}`;
+      }
+
       const { ticket } = await createTicket({
         title: title.trim(),
         clientId: user.clientId,
-        description: description.trim() || undefined,
+        projectId,
+        description: finalDescription || undefined,
         ticketType,
-        companyName: companyName.trim() || undefined,
         module,
       });
 
@@ -193,16 +247,26 @@ export function NewTicketPage() {
           </div>
 
           <div className="field">
-            <label htmlFor="companyName">Nome da empresa</label>
-            <input
-              id="companyName"
-              value={companyName}
-              onChange={(e) => setCompanyName(e.target.value)}
+            <label htmlFor="projectId">Projeto *</label>
+            <select
+              id="projectId"
+              value={projectId}
+              onChange={(e) => setProjectId(e.target.value)}
               required
-              minLength={1}
-              disabled={formLoading}
-              placeholder="Razão social ou nome fantasia"
-            />
+              disabled={formLoading || !user?.clientId}
+            >
+              <option value="">— Selecione um projeto —</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} ({p.code})
+                </option>
+              ))}
+            </select>
+            {!projectId && user?.clientId ? (
+              <span className="muted field-note">
+                Nenhum projeto ativo para o seu cliente. Peça à consultoria para criar um projeto.
+              </span>
+            ) : null}
           </div>
 
           <div className="field">
@@ -221,6 +285,25 @@ export function NewTicketPage() {
               ))}
             </select>
           </div>
+
+          {activeOfferings.length > 0 && (
+            <div className="field">
+              <label htmlFor="serviceOffering">Oferta de Serviço (Opcional)</label>
+              <select
+                id="serviceOffering"
+                value={serviceOffering}
+                onChange={(e) => setServiceOffering(e.target.value)}
+                disabled={formLoading}
+              >
+                <option value="">Nenhuma oferta selecionada</option>
+                {activeOfferings.map((o) => (
+                  <option key={o.id} value={o.name}>
+                    {o.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="field">
             <label htmlFor="title">Assunto</label>
@@ -254,8 +337,8 @@ export function NewTicketPage() {
             {file ? (
               <span className="muted field-note">
                 {file.name}
-                {file.type ? ` · ${file.type}` : ""}
-                {` · ${file.size} B`}
+                {file.type ? ` − ${file.type}` : ""}
+                {` − ${file.size} B`}
               </span>
             ) : (
               <span className="muted field-note">

@@ -13,6 +13,7 @@ import {
   getStoredToken,
   isStaffRole,
   login as apiLogin,
+  logout as apiLogout,
   me,
   setStoredToken,
   switchOrg as apiSwitchOrg,
@@ -98,6 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
+    void apiLogout();
     setStoredToken(null);
     setToken(null);
     setUser(null);

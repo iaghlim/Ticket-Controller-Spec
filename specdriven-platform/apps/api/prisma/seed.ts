@@ -194,6 +194,23 @@ async function main() {
     },
   });
 
+  const project = await prisma.project.upsert({
+    where: { id: "00000000-0000-4000-8000-000000000099" },
+    update: {
+      name: "Projeto Demo",
+      code: "DEMO",
+      billingModel: "per_hour",
+    },
+    create: {
+      id: "00000000-0000-4000-8000-000000000099",
+      organizationId: org.id,
+      clientId: client.id,
+      name: "Projeto Demo",
+      code: "DEMO",
+      billingModel: "per_hour",
+    },
+  });
+
   await prisma.ticket.upsert({
     where: {
       organizationId_key: {
@@ -205,12 +222,14 @@ async function main() {
       title: "Chamado demo inicial",
       status: "backlog",
       clientId: client.id,
+      projectId: project.id,
       assigneeId: gestor.id,
       hourLimitMinutes: 60,
     },
     create: {
       organizationId: org.id,
       clientId: client.id,
+      projectId: project.id,
       key: "DEMO-1",
       title: "Chamado demo inicial",
       description: "Ticket de seed para smoke tests da API.",

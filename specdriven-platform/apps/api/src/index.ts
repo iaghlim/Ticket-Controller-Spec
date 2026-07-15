@@ -33,6 +33,16 @@ import {
   listClientsHandler,
 } from "./clients.js";
 import {
+  createProjectHandler,
+  listProjectsHandler,
+  getProjectHandler,
+  updateProjectHandler,
+  deleteProjectHandler,
+  listAssignmentsHandler,
+  createAssignmentHandler,
+  deleteAssignmentHandler,
+} from "./projects.js";
+import {
   createCommentHandler,
   listCommentsHandler,
 } from "./comments.js";
@@ -59,7 +69,13 @@ import {
   restoreTicketHandler,
   softDeleteTicketHandler,
 } from "./privacy.js";
-import { ticketsReportHandler } from "./reports.js";
+import { ticketsReportHandler, ticketsCsvHandler } from "./reports.js";
+import {
+  getServiceHealthHandler,
+  getServiceHealthCsvHandler,
+  getTrendsReportHandler,
+  submitTicketFeedbackHandler,
+} from "./service-health.js";
 import { searchHandler } from "./search.js";
 import {
   createSlaPolicyHandler,
@@ -121,11 +137,47 @@ import {
   createOrgUserHandler,
   listOrganizationsHandler,
 } from "./organizations.js";
+
 import {
-  createProjectHandler,
-  listProjectsHandler,
-} from "./projects.js";
+  listProblemsHandler,
+  createProblemHandler,
+  getProblemHandler,
+  patchProblemHandler,
+  linkIncidentsHandler,
+  unlinkIncidentHandler,
+} from "./problems.js";
+import {
+  listChangesHandler,
+  createChangeHandler,
+  getChangeHandler,
+  patchChangeHandler,
+  submitChangeHandler,
+  cabChangeHandler,
+} from "./changes.js";
+import {
+  listArticlesHandler,
+  createArticleHandler,
+  getArticleHandler,
+  patchArticleHandler,
+  deleteArticleHandler,
+  portalListArticlesHandler,
+} from "./knowledge.js";
+import {
+  listOfferingsHandler,
+  createOfferingHandler,
+  patchOfferingHandler,
+  deleteOfferingHandler,
+} from "./service-offerings.js";
+import {
+  listRisksHandler,
+  createRiskHandler,
+  getRiskHandler,
+  updateRiskHandler,
+  deleteRiskHandler,
+} from "./risks.js";
+import { checkSlaWarningsHandler } from "./sla-warning.js";
 import { prisma } from "./db.js";
+import { linkUserToProjectHandler, listUserProjectsHandler, unlinkUserFromProjectHandler } from "./user-projects.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(here, "../../../.env") });
@@ -154,6 +206,7 @@ async function buildServer() {
       }
       cb(null, false);
     },
+    credentials: true,
   });
 
   await app.register(multipart, {
@@ -275,6 +328,12 @@ async function buildServer() {
   app.get("/audit", listAuditHandler);
 
   app.get("/reports/tickets", ticketsReportHandler);
+  app.get("/reports/tickets.csv", ticketsCsvHandler);
+  app.get("/reports/service-health", getServiceHealthHandler);
+  app.get("/reports/service-health.csv", getServiceHealthCsvHandler);
+  app.get("/reports/trends", getTrendsReportHandler);
+  app.post("/tickets/:key/feedback", submitTicketFeedbackHandler);
+  app.post("/tickets/check-sla", checkSlaWarningsHandler);
 
   app.get("/users", listUsersHandler);
 
@@ -283,7 +342,49 @@ async function buildServer() {
   app.post("/organizations/:organizationId/users", createOrgUserHandler);
 
   app.get("/projects", listProjectsHandler);
+  app.get("/user-projects", listUserProjectsHandler);
   app.post("/projects", createProjectHandler);
+  app.post("/projects/:id/users", linkUserToProjectHandler);
+  app.get("/projects/:id", getProjectHandler);
+  app.patch("/projects/:id", updateProjectHandler);
+  app.delete("/projects/:id", deleteProjectHandler);
+  app.delete("/projects/:id/users", unlinkUserFromProjectHandler);
+  app.get("/settings/projects/:id/assignments", listAssignmentsHandler);
+  app.post("/settings/projects/:id/assignments", createAssignmentHandler);
+  app.delete("/settings/projects/:id/assignments", deleteAssignmentHandler);
+  app.delete("/settings/projects/:id/assignments/:assignmentId", deleteAssignmentHandler);
+
+  app.get("/problems", listProblemsHandler);
+  app.post("/problems", createProblemHandler);
+  app.get("/problems/:id", getProblemHandler);
+  app.patch("/problems/:id", patchProblemHandler);
+  app.post("/problems/:id/incidents", linkIncidentsHandler);
+  app.delete("/problems/:id/incidents/:ticketId", unlinkIncidentHandler);
+
+  app.get("/changes", listChangesHandler);
+  app.post("/changes", createChangeHandler);
+  app.get("/changes/:id", getChangeHandler);
+  app.patch("/changes/:id", patchChangeHandler);
+  app.post("/changes/:id/submit", submitChangeHandler);
+  app.post("/changes/:id/cab", cabChangeHandler);
+
+  app.get("/risks", listRisksHandler);
+  app.post("/risks", createRiskHandler);
+  app.get("/risks/:id", getRiskHandler);
+  app.patch("/risks/:id", updateRiskHandler);
+  app.delete("/risks/:id", deleteRiskHandler);
+
+  app.get("/knowledge", listArticlesHandler);
+  app.post("/knowledge", createArticleHandler);
+  app.get("/knowledge/:id", getArticleHandler);
+  app.patch("/knowledge/:id", patchArticleHandler);
+  app.delete("/knowledge/:id", deleteArticleHandler);
+  app.get("/portal/knowledge", portalListArticlesHandler);
+
+  app.get("/settings/catalog/offerings", listOfferingsHandler);
+  app.post("/settings/catalog/offerings", createOfferingHandler);
+  app.patch("/settings/catalog/offerings/:id", patchOfferingHandler);
+  app.delete("/settings/catalog/offerings/:id", deleteOfferingHandler);
 
   app.get("/settings", getSettingsHandler);
   app.patch("/settings/organization", patchOrganizationSettingsHandler);

@@ -9,6 +9,8 @@ import {
   listUsers,
   ticketsReport,
   type TicketsReport,
+  apiBaseUrl,
+  getStoredToken,
 } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { shortId, statusLabel } from "../lib/labels";
@@ -73,14 +75,50 @@ export function ReportsPage() {
     ).reduce((sum, s) => sum + (report.byStatus[s] ?? 0), 0);
   }, [report]);
 
+  const handleExportCsv = async () => {
+    try {
+      const auth = getStoredToken();
+      const response = await fetch(`${apiBaseUrl}/reports/tickets.csv`, {
+        headers: {
+          ...(auth ? { Authorization: `Bearer ${auth}` } : {}),
+        },
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("Falha ao exportar CSV");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `tickets-export-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao exportar o relatório CSV.");
+    }
+  };
+
   return (
     <>
-      <div className="page-head">
+      <div className="page-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
         <div>
           <p className="page-eyebrow">Gestão</p>
           <h1 className="page-title-serif">Relatórios.</h1>
           <p>Agregações e visão de esforço da operação.</p>
         </div>
+        <button
+          onClick={handleExportCsv}
+          className="btn"
+          style={{ height: "38px" }}
+        >
+          Exportar CSV
+        </button>
       </div>
 
       {loading ? <p className="muted">Carregando…</p> : null}

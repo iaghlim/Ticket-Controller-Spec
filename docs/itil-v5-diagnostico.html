@@ -1,0 +1,1440 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Diagnóstico ITIL v5 — SpecDriven ITSM</title>
+<style>
+  :root {
+    --bg: #fafaf7;
+    --fg: #1c1a17;
+    --muted: #6b635a;
+    --line: #e7e1d6;
+    --line-strong: #cfc6b4;
+    --card: #ffffff;
+    --accent: #2f3a4a;
+    --accent-2: #b07a3a;
+    --ok: #2f7a55;
+    --ok-bg: #e6f1ea;
+    --warn: #b07a3a;
+    --warn-bg: #f7eedf;
+    --high: #c0532e;
+    --high-bg: #fbe9df;
+    --crit: #8a2a2a;
+    --crit-bg: #f7dadb;
+    --info: #2f5a8a;
+    --info-bg: #e3edf7;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 48px 32px 96px; }
+  header.hero {
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 28px;
+    margin-bottom: 40px;
+  }
+  .eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    font-size: 0.72rem;
+    color: var(--accent-2);
+    font-weight: 600;
+  }
+  h1 {
+    font-size: 2.4rem;
+    line-height: 1.15;
+    margin: 6px 0 12px;
+    letter-spacing: -0.01em;
+    font-weight: 700;
+  }
+  h1.serif { font-family: "Iowan Old Style", "Georgia", "Times New Roman", serif; font-weight: 600; }
+  h2 {
+    font-size: 1.55rem;
+    margin: 56px 0 14px;
+    letter-spacing: -0.01em;
+  }
+  h3 { font-size: 1.15rem; margin: 28px 0 10px; }
+  h4 { font-size: 1rem; margin: 18px 0 8px; color: var(--accent); }
+  p { margin: 0 0 12px; }
+  .lead { font-size: 1.08rem; color: var(--muted); max-width: 75ch; }
+  .meta-row { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 16px; color: var(--muted); font-size: 0.92rem; }
+  .meta-row strong { color: var(--fg); }
+  a { color: var(--accent-2); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .toc {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin: 32px 0;
+  }
+  .toc h3 { margin-top: 0; }
+  .toc ol { padding-left: 22px; margin: 0; }
+  .toc li { margin: 4px 0; }
+  section { margin-top: 24px; }
+  .grid { display: grid; gap: 16px; }
+  .grid-2 { grid-template-columns: repeat(2, 1fr); }
+  .grid-3 { grid-template-columns: repeat(3, 1fr); }
+  .grid-4 { grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 900px) {
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 20px 22px;
+  }
+  .pill {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .pill-ok { background: var(--ok-bg); color: var(--ok); }
+  .pill-warn { background: var(--warn-bg); color: var(--warn); }
+  .pill-high { background: var(--high-bg); color: var(--high); }
+  .pill-crit { background: var(--crit-bg); color: var(--crit); }
+  .pill-info { background: var(--info-bg); color: var(--info); }
+  .pill-muted { background: #eee; color: #555; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 18px; font-size: 0.92rem; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { background: #f4efe5; color: var(--accent); font-weight: 600; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  tr:hover td { background: #faf7f0; }
+  code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; }
+  .code {
+    background: #1f2024;
+    color: #e9e3d4;
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-size: 0.84rem;
+    line-height: 1.45;
+  }
+  .code .k { color: #d99a5b; }
+  .code .s { color: #b8c98a; }
+  .code .c { color: #7d7468; font-style: italic; }
+  .code .p { color: #6fa3c2; }
+  .kv { display: grid; grid-template-columns: 220px 1fr; gap: 6px 16px; font-size: 0.93rem; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; }
+  .callout {
+    border-left: 3px solid var(--accent-2);
+    background: #faf3e7;
+    padding: 14px 18px;
+    border-radius: 0 8px 8px 0;
+    margin: 14px 0;
+  }
+  .callout strong { color: var(--accent); }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 18px; }
+  .legend .pill { font-size: 0.7rem; }
+  .stack { display: flex; flex-direction: column; gap: 12px; }
+  .progress {
+    background: #ece6d8;
+    border-radius: 999px;
+    overflow: hidden;
+    height: 10px;
+    margin: 6px 0 12px;
+  }
+  .progress > span { display: block; height: 100%; background: linear-gradient(90deg, #b07a3a, #2f7a55); }
+  .kpi {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 18px 20px;
+  }
+  .kpi .label { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; }
+  .kpi .value { font-size: 1.7rem; font-weight: 700; margin-top: 4px; }
+  .kpi .note { color: var(--muted); font-size: 0.84rem; }
+  details { border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; background: #fff; margin: 8px 0; }
+  details[open] { background: #fdfaf2; }
+  details > summary { cursor: pointer; font-weight: 600; }
+  details > summary::-webkit-details-marker { display: none; }
+  details > summary::before { content: "▸ "; color: var(--accent-2); }
+  details[open] > summary::before { content: "▾ "; }
+  .badge-soft {
+    display: inline-block;
+    background: #f1ebd9;
+    color: #4d4536;
+    padding: 1px 8px;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+  .small { font-size: 0.85rem; color: var(--muted); }
+  .diagram {
+    background: #fdfaf2;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+  }
+  .diagram .lane {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin: 10px 0;
+  }
+  .diagram .node {
+    background: #fff;
+    border: 1px solid var(--line-strong);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    min-width: 130px;
+    text-align: center;
+  }
+  .diagram .node strong { color: var(--accent); }
+  .arrow { color: var(--accent-2); font-size: 1.2rem; }
+  .footer {
+    margin-top: 80px;
+    border-top: 1px solid var(--line);
+    padding-top: 20px;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+  .anchor-link { opacity: 0; margin-left: 6px; color: var(--accent-2); font-size: 0.7em; }
+  h2:hover .anchor-link, h3:hover .anchor-link { opacity: 1; }
+  .table-wrap { overflow-x: auto; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="eyebrow">Diagnóstico ITIL v5 · Maturidade Tática</div>
+    <h1 class="serif">SpecDriven ITSM — onde já somos ITIL, e o que falta pra fechar</h1>
+    <p class="lead">
+      O produto já implementa, na camada de código e no fluxo de UI, um subconjunto
+      expressivo das práticas de gestão de serviços do ITIL v5 — em particular toda a
+      família de suporte a usuário (Incidente, Requisição de Serviço, SLA, Service
+      Desk) e o esqueleto de Service Request Fulfillment. Há também um embrião maduro
+      de gestão de mudanças (Change Enablement via aprovações) e de catálogo
+      (Service Catalog) já parametrizável pelo gestor.
+    </p>
+    <p class="lead">
+      O gap real para maturidade <strong>tática</strong> (visível + métricas) não é
+      reescrever nada: é (a) rotular o que já existe com o vocabulário ITIL v5,
+      (b) expor métricas calculadas em dashboard, (c) fechar três práticas que estão
+      semi-prontas mas não-acionáveis (Problem Management, Change Enablement
+      formal, Knowledge Management) e (d) introduzir um Catálogo de Serviços
+      com SLA por oferta — não só por cliente.
+    </p>
+    <div class="meta-row">
+      <div><strong>Escopo:</strong> Monorepo <code>specdriven-platform</code> + app <code>SpecDriven</code> (Tauri)</div>
+      <div><strong>Data:</strong> 13/07/2026</div>
+      <div><strong>Stack auditado:</strong> Node/TS + Fastify + Prisma + Postgres + Vite/React + Tauri/Rust</div>
+    </div>
+  </header>
+
+  <nav class="toc">
+    <h3>Conteúdo</h3>
+    <ol>
+      <li><a href="#resumo">Resumo executivo</a></li>
+      <li><a href="#cobertura">Mapa de cobertura — 34 práticas ITIL v5</a></li>
+      <li><a href="#fortes">Práticas fortes (com prova em código)</a></li>
+      <li><a href="#gaps">Gaps por severidade</a></li>
+      <li><a href="#roadmap">Roadmap priorizado — 4 ondas</a></li>
+      <li><a href="#metricas">Métricas táticas — o que medir e como</a></li>
+      <li><a href="#arquitetura">Mapa de mudanças arquiteturais sugeridas</a></li>
+      <li><a href="#glossario">Glossário ITIL v5 → nomenclatura atual</a></li>
+      <li><a href="#riscos">Riscos e anti-padrões a evitar</a></li>
+      <li><a href="#apendice">Apêndice — arquivos auditados</a></li>
+    </ol>
+  </nav>
+
+  <!-- ============================== RESUMO ============================== -->
+  <section id="resumo">
+    <h2>1. Resumo executivo <a class="anchor-link" href="#resumo">#</a></h2>
+
+    <div class="grid grid-3" style="margin-bottom: 18px;">
+      <div class="kpi">
+        <div class="label">Práticas com cobertura sólida</div>
+        <div class="value">9 / 34</div>
+        <div class="note">Incidente, Requisição de Serviço, SLA, Service Desk, Monitoramento, Mudança (parcial), Catálogo, Configuração (parcial), Continuidade (parcial)</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Práticas semi-prontas (gap tático)</div>
+        <div class="value">8 / 34</div>
+        <div class="note">Problema, Mudança formal, Release, Validação, Knowledge, Melhoria, Nível de serviço, Portfolio</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Práticas ausentes</div>
+        <div class="value">17 / 34</div>
+        <div class="note">Estratégia, Relacionamento, Fornecimento, Demanda, Capacidade, Disponibilidade, Segurança da Informação, Sustentabilidade, Workforce, Arquitetura, Risco, Finança, Conformidade, etc.</div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <strong>Achado central:</strong> o produto é forte em <em>Service Operation</em>
+      (operação do dia-a-dia) e fraco em <em>Service Strategy / Design / Transition
+      (governança)</em>. Isso é coerente com o estágio de uma consultoria B2B2C
+      que ainda está provando operação antes de virar PMO formal. Não é bug — é a
+      hora certa de cada coisa.
+    </div>
+
+    <h3>Recomendação de leitura deste documento</h3>
+    <p>
+      Se você tem 10 minutos: leia <a href="#resumo">o resumo</a> e
+      <a href="#roadmap">o roadmap</a>. Se tem 30: leia mais
+      <a href="#cobertura">o mapa de cobertura</a> e
+      <a href="#gaps">os gaps</a>. Se for virar spec de implementação:
+      <a href="#metricas">métricas</a>,
+      <a href="#arquitetura">arquitetura</a> e
+      <a href="#glossario">glossário</a>.
+    </p>
+  </section>
+
+  <!-- ============================== COBERTURA ============================== -->
+  <section id="cobertura">
+    <h2>2. Mapa de cobertura — 34 práticas ITIL v5 <a class="anchor-link" href="#cobertura">#</a></h2>
+
+    <p class="small">
+      Status por prática: <span class="pill pill-ok">Pronto</span> implementada
+      de ponta a ponta · <span class="pill pill-warn">Parcial</span> peças
+      existem mas faltam amarração tática (UI, métrica, automação) ·
+      <span class="pill pill-high">Esboço</span> modelo de dados e/ou
+      intent existe, mas não é acionável · <span class="pill pill-crit">Ausente</span>
+      não-encontrado.
+    </p>
+
+    <div class="legend">
+      <span class="pill pill-ok">Pronto</span>
+      <span class="pill pill-warn">Parcial</span>
+      <span class="pill pill-high">Esboço</span>
+      <span class="pill pill-crit">Ausente</span>
+    </div>
+
+    <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 26%;">Prática ITIL v5</th>
+          <th style="width: 9%;">Status</th>
+          <th>Como o produto atende hoje</th>
+          <th>Gap tático (resumo)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td colspan="4" style="background:#f4efe5; font-weight:600;">Cadeia de valor de serviço (SVC)</td></tr>
+
+        <tr>
+          <td><strong>Service Desk</strong> (Ponto único de contato)</td>
+          <td><span class="pill pill-ok">Pronto</span></td>
+          <td>Dois portais (cliente e staff), AppShell com sino, busca, notificações, comentários <em>public/internal</em>, matriz evento×canal configurável.</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td><strong>Incident Management</strong></td>
+          <td><span class="pill pill-ok">Pronto</span></td>
+          <td>Tipo ITIL <code>incidente</code>, status <code>em_andamento / aguardando_cliente / em_teste / concluido / cancelado</code>, primeira resposta automática, <code>firstResponseAt</code> e <code>resolvedAt</code> no modelo.</td>
+          <td>Não há "Major Incident" formal nem árvore de classificação.</td>
+        </tr>
+        <tr>
+          <td><strong>Problem Management</strong></td>
+          <td><span class="pill pill-high">Esboço</span></td>
+          <td>Tipo <code>problema</code> existe no enum <code>TicketType</code>, mas é só um label; não há entidade <code>Problem</code>, não há vínculo com <em>Known Errors</em>, nem root cause tracking.</td>
+          <td>Sem mecanismo de agrupar incidentes, sem base de Known Errors, sem KEDB.</td>
+        </tr>
+        <tr>
+          <td><strong>Service Request Management</strong></td>
+          <td><span class="pill pill-ok">Pronto</span></td>
+          <td>Catálogo de tipos ITIL (<code>melhoria / duvida / problema / incidente</code>) habilitável por consultoria, módulos por área, formulário de abertura com validação.</td>
+          <td>Faltam "service offerings" formais (request types) com SLA por oferta; hoje SLA é por cliente×prioridade.</td>
+        </tr>
+        <tr>
+          <td><strong>Service Level Management</strong></td>
+          <td><span class="pill pill-ok">Pronto</span></td>
+          <td><code>SlaPolicy</code> por (cliente, prioridade), cálculo de horas úteis com feriados, <code>slaDueAt</code>, badge <code>badge-sla-{ok|breached|paused|done}</code>, recalcular em massa, <code>slaTargetPct</code>.</td>
+          <td>Catálogo de ofertas com SLA (não só cliente), SLAs de "service request fulfillment" distintos dos de incidente.</td>
+        </tr>
+        <tr>
+          <td><strong>Service Catalog Management</strong></td>
+          <td><span class="pill pill-warn">Parcial</span></td>
+          <td><code>enabledTicketTypes</code> (subset) e <code>TicketModuleCatalog</code> (módulos), exibido em <code>GET /portal/settings</code> e no formulário de novo ticket.</td>
+          <td>Falta entidade <em>Service Offering</em> (nome, descrição, prazo, custo) com versionamento e aprovação; hoje é uma enum.</td>
+        </tr>
+        <tr>
+          <td><strong>Monitoring &amp; Event Management</strong></td>
+          <td><span class="pill pill-warn">Parcial</span></td>
+          <td>Há health check (<code>/health</code> + storage), log de auditoria, e "audit log UI" em <code>/settings/audit</code>. Notificações in-app e e-mail (Brevo/SMTP) cobrem "eventos de serviço" manuais.</td>
+          <td>Sem métrica/evento automático; sem observabilidade sintética (ping, synthetic). E-mail de "SLA warning" está marcado como P2.</td>
+        </tr>
+        <tr>
+          <td><strong>Change Enablement</strong></td>
+          <td><span class="pill pill-warn">Parcial</span></td>
+          <td>Workflow de <em>approvals</em> já existe (<code>ApprovalRequest</code> kind <code>ticket | hour_limit | time_entry</code>), com <code>targetStatus</code> (ex. concluir) e <code>decisionNote</code>.</td>
+          <td>Não há entidade <em>Change</em> (RFC) com risco, plano de rollback, janela de mudança, CAB. Faltam métricas de change success rate e unauthorized change.</td>
+        </tr>
+        <tr>
+          <td><strong>Release Management</strong></td>
+          <td><span class="pill pill-crit">Ausente</span></td>
+          <td>—</td>
+          <td>Não há conceito de release train, deploy calendar ou release notes. Há go-live checklist (operacional, não ITIL).</td>
+        </tr>
+        <tr>
+          <td><strong>Service Validation &amp; Testing</strong></td>
+          <td><span class="pill pill-crit">Ausente</span></td>
+          <td>Há testes de API (smoke) e E2E Playwright de login, mas não no conceito ITIL.</td>
+          <td>Não há "service validation" automatizada contra catálogo.</td>
+        </tr>
+        <tr>
+          <td><strong>Knowledge Management</strong></td>
+          <td><span class="pill pill-high">Esboço</span></td>
+          <td><code>knowledgeBaseEnabled</code> + <code>knowledgeBaseUrl</code> (externo) — só link out. <code>Tag</code> com <code>visibleToClient</code>.</td>
+          <td>Não há base interna de artigos; não há KEDB; "Knowledge" não está nem como tipo nem como entidade.</td>
+        </tr>
+        <tr>
+          <td><strong>Continuity Management</strong></td>
+          <td><span class="pill pill-warn">Parcial</span></td>
+          <td>Há backup Postgres no <code>docker-compose.prod.yml</code> (a verificar) e P0.x no go-live. Sem entidade de "Plano de Continuidade".</td>
+          <td>Falta plano formal, BIA (Business Impact Analysis), testes de continuidade.</td>
+        </tr>
+        <tr>
+          <td><strong>Information Security Management</strong></td>
+          <td><span class="pill pill-warn">Parcial</span></td>
+          <td>JWT em <code>Authorization: Bearer</code>, RBAC por papel, audit log, privacy settings (LGPD UI), SMTP por consultoria (P2). Doc <code>security.md</code> lista ameaças.</td>
+          <td>JWT em <code>localStorage</code> (risco XSS) — explicitamente listado em <code>docs/security.md</code>. Falta política de rotação, MFA, threat model.</td>
+        </tr>
+        <tr>
+          <td><strong>Availability Management</strong></td>
+          <td><span class="pill pill-crit">Ausente</span></td>
+          <td>—</td>
+          <td>Sem SLO de disponibilidade, sem medição de uptime.</td>
+        </tr>
+        <tr>
+          <td><strong>Capacity &amp; Performance Management</strong></td>
+          <td><span class="pill pill-crit">Ausente</span></td>
+          <td>—</td>
+          <td>Sem thresholds, sem plano de capacidade.</td>
+        </tr>
+        <tr>
+          <td><strong>Software Development &amp; Management</strong></td>
+          <td><span class="pill pill-warn">Parcial</span></td>
+          <td>Há <code>mock_figma</code> e o app desktop Tauri. SpecDriven tem sync com cloud. O modelo <code>Project</code> (id, name, clientId) existe.</td>
+          <td>Project não tem milestones, status, ou orçamento. Não é PMO.</td>
+        </tr>
+
+        <tr><td colspan="4" style="background:#f4efe5; font-weight:600;">Práticas organizacionais &amp; de gestão (gerais)</td></tr>
+
+        <tr>
+          <td><strong>Service Strategy</strong></td>
+          <td><span class="pill pill-crit">Ausente</span></td>
+          <td>—</td>
+          <td>Sem service portfolio, value stream, market analysis.</td>
+        </tr>
+        <tr>
+          <td><strong>Service Value System (SVS)</strong> / Cadeia de valor</td>
+          <td><span class="pill pill-warn">Parcial</span></td>
+          <td>Implícito: o fluxo "ticket → comentário → hora → aprovação → conclusão" é uma cadeia de valor informal.</td>
+          <td>Não há diagrama de cadeia de valor publicado, OKRs por atividade.</td>
+        </tr>
+        <tr>
+          <td><strong>Relationship Management</strong></td>
+          <td><span class="pill pill-high">Esboço</span></td>
+          <td><code>Client</code> com baseline, hourly rate, code. <code>Project</code> por cliente. <code>supportEmail</code> e <code>supportPolicyText</code>.</td>
+          <td>Sem "service consumer" formal, sem "complaint", sem CSAT/NPS.</td>
+        </tr>
+        <tr>
+          <td><strong>Supplier Management</strong></td>
+          <td><span class="pill pill-crit">Ausente</span></td>
+          <td>—</td>
+          <td>Fornecedor SMTP (Brevo) é config; sem entidade <em>Supplier</em>.</td>
+        </tr>
+        <tr>
+          <td><strong>Demand Management</strong></td>
+          <td><span class="pill pill-warn">Parcial</span></td>
+          <td>Baseline de horas/mês por cliente (<code>baselineHoursMonth</code>), com <em>baselineRemaining</em> no overview. <code>countsTowardBaseline</code> por ticket.</td>
+          <td>Sem priorização de demanda, sem backlog visível de projetos.</td>
+        </tr>
+        <tr>
+          <td><strong>Portfolio Management</strong> (de serviços)</td>
+          <td><span class="pill pill-high">Esboço</span></td>
+          <td><code>Project</code> + <code>Client</code>. Settings (sprint 1-4) categoriza o que a consultoria oferece.</td>
+          <td>Sem agregação em programas, sem priorização de projetos.</td>
+        </tr>
+        <tr>
+          <td><strong>Workforce &amp; Talent Management</strong></td>
+          <td><span class="pill pill-crit">Ausente</span></td>
+          <td>—</td>
+          <td>Sem skill matrix, sem alocação por competência.</td>
+        </tr>
+        <tr>
+          <td><strong>Risk Management</strong></td>
+          <td><span class="pill pill-crit">Ausente</span></td>
+          <td>—</td>
+          <td>Sem risk register, sem scoring.</td>
+        </tr>
+        <tr>
+          <td><strong>Finance Management</strong></td>
+          <td><span class="pill pill-warn">Parcial</span></td>
+          <td><code>baselineHoursMonth</code>, <code>hourlyRateCents</code>, <code>hourRateFactor</code> por consultor, billing summary API.</td>
+          <td>Sem invoice, sem cost-per-ticket, sem rateio automático.</td>
+        </tr>
+        <tr>
+          <td><strong>Sustainability Management</strong></td>
+          <td><span class="pill pill-crit">Ausente</span></td>
+          <td>—</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td><strong>Architectural Management</strong></td>
+          <td><span class="pill pill-crit">Ausente</span></td>
+          <td>—</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td><strong>Improvement (CSI)</strong></td>
+          <td><span class="pill pill-high">Esboço</span></td>
+          <td>Há <code>TicketsReport</code> (por status / assignee), <code>computePeriodSlaPct</code> para mês/trimestre, <code>slaAtRisk</code> no Overview. Sem Action Plan formal.</td>
+          <td>Falta "continual improvement register" e dashboard dedicado de CSI.</td>
+        </tr>
+        <tr>
+          <td><strong>Measurement &amp; Reporting</strong></td>
+          <td><span class="pill pill-warn">Parcial</span></td>
+          <td><code>ticketsReport</code>, SLA %, baseline, horas pendentes — exibidos em <code>OverviewPage</code> e <code>ReportsPage</code>.</td>
+          <td>Faltam MTTR, MTTA, FCR, change success rate, CSAT, NPS, backlog aging. Sem exportação CSV/Excel.</td>
+        </tr>
+        <tr>
+          <td><strong>Change Control</strong> (não-enabling)</td>
+          <td><span class="pill pill-warn">Parcial</span></td>
+          <td><code>ApprovalRequest</code> para fechar ticket ou aumentar horas — funciona como controle de mudança leve.</td>
+          <td>Sem RFC com risco, sem janela, sem CAB, sem rollback plan.</td>
+        </tr>
+        <tr>
+          <td><strong>Incident Categorization</strong></td>
+          <td><span class="pill pill-warn">Parcial</span></td>
+          <td><code>module</code> (chave do catálogo), <code>priority</code> (baixa/media/alta/critica), <code>ticketType</code> ITIL.</td>
+          <td>Falta "service" como primeira dimensão de categorização.</td>
+        </tr>
+        <tr>
+          <td><strong>Service Configuration Management</strong></td>
+          <td><span class="pill pill-high">Esboço</span></td>
+          <td>Há <code>OrganizationSettings</code>, <code>SlaPolicy</code>, <code>Tag</code>, <code>Client</code>, <code>Project</code>. Atribuíveis por org. Mas sem "Configuration Item" (CI) formal — não há CMDB.</td>
+          <td>Sem CMDB, sem relação entre CIs (cliente × módulo × sistema × ticket).</td>
+        </tr>
+        <tr>
+          <td><strong>Audit &amp; Assurance</strong></td>
+          <td><span class="pill pill-ok">Pronto</span></td>
+          <td><code>AuditEvent</code> cobre actions sensíveis; UI em <code>/settings/audit</code> com filtro por <code>entityType</code>.</td>
+          <td>Falta retenção/expurgo automático, falta trilha de "read" (LGPD).</td>
+        </tr>
+        <tr>
+          <td><strong>Compliance &amp; Policy</strong></td>
+          <td><span class="pill pill-warn">Parcial</span></td>
+          <td>LGPD UI em <code>/settings/privacy</code>, política de atendimento no footer do portal.</td>
+          <td>Sem "policy" versionada, sem assinatura de aceite por cliente.</td>
+        </tr>
+        <tr>
+          <td><strong>Strategy &amp; Portfolio (criação de valor)</strong></td>
+          <td><span class="pill pill-crit">Ausente</span></td>
+          <td>—</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td><strong>User Experience (não-prática formal, mas crescente)</strong></td>
+          <td><span class="pill pill-warn">Parcial</span></td>
+          <td>Portal cliente com hero customizável, KB link, info-strip "Acesso segregado".</td>
+          <td>Sem CSAT pós-resolução, sem NPS, sem UX research.</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <!-- ============================== FORTES ============================== -->
+  <section id="fortes">
+    <h2>3. Práticas fortes — o que já é sólido, com prova em código <a class="anchor-link" href="#fortes">#</a></h2>
+
+    <p>
+      A qualidade do que já existe é o motivo principal pra escrever este
+      diagnóstico: implementar ITIL v5 num SaaS B2B2C do porte desse
+      tipicamente leva 6–12 meses. Vocês já estão muito à frente. Esta
+      seção mostra a evidência.
+    </p>
+
+    <h3>3.1 Incident Management — fluxo completo, com cálculo de SLA</h3>
+    <p>
+      O tipo ITIL <code>incidente</code> é uma das quatro <code>TicketType</code> e
+      tem ciclo de vida próprio (<code>backlog → em_andamento → aguardando_cliente
+      → em_teste → concluido / cancelado</code>). O primeiro atendimento é
+      automático:
+    </p>
+
+    <div class="code"><span class="c">// apps/api/src/tickets.ts (linhas ~340-350)</span>
+<span class="k">if</span> (statusChanging && nextStatus) {
+  <span class="k">if</span> (!ticket.firstResponseAt &&
+      previousStatus === <span class="s">"backlog"</span> &&
+      nextStatus !== <span class="s">"backlog"</span> &&
+      nextStatus !== <span class="s">"cancelado"</span>) {
+    slaExtras.firstResponseAt = <span class="k">new</span> Date();
+  }
+  <span class="k">if</span> (nextStatus === <span class="s">"concluido"</span> || nextStatus === <span class="s">"cancelado"</span>) {
+    slaExtras.resolvedAt = <span class="k">new</span> Date();
+  } <span class="k">else if</span> (previousStatus === <span class="s">"concluido"</span> || previousStatus === <span class="s">"cancelado"</span>) {
+    slaExtras.resolvedAt = <span class="k">null</span>;
+    slaExtras.slaDueAt = <span class="k">await</span> computeSlaDueAt({ ... from: ticket.createdAt });
+  }
+}</div>
+
+    <p>
+      E o cálculo de SLA é um motor de horas úteis completo
+      (<code>apps/api/src/sla-calc.ts</code>), com suporte a horário comercial
+      por política, feriados por organização, e janela [<code>start</code>,
+      <code>end</code>) por dia da semana ISO (1=Seg…7=Dom). É ITIL-bulletproof.
+    </p>
+
+    <h3>3.2 Service Level Management — alvo de 90% no overview</h3>
+    <p>
+      O <code>packages/shared/src/sla-helpers.ts</code> já entrega três
+      períodos de análise (mês atual, mês anterior, trimestre) e a função
+      <code>computePeriodSlaPct</code> é puro, testável, e usada tanto no
+      overview staff quanto na home do cliente.
+    </p>
+
+    <h3>3.3 Service Desk — dois portais, sino, busca, comentários, visibilidade</h3>
+    <p>
+      Modelo de comentário carrega <code>visibility: public | internal</code>
+      (essencial ITIL — comentários internos não viram notificação do
+      cliente). Notificações usam matriz evento×canal configurável por
+      consultoria (<code>defaultNotificationPrefs()</code>).
+    </p>
+
+    <h3>3.4 Service Catalog — habilitação por consultoria</h3>
+    <p>
+      Catálogo configurável em <code>/settings/catalog</code>:
+      quatro tipos ITIL (<code>melhoria, incidente, duvida, problema</code>) +
+      módulos customizáveis (<code>TicketModuleCatalog</code> com chave,
+      label, sortOrder, enabled). O portal cliente consome via
+      <code>GET /portal/settings</code> — o que é a essência de Service
+      Catalog Management.
+    </p>
+
+    <h3>3.5 Audit trail — base sólida para conformidade</h3>
+    <p>
+      <code>AuditEvent</code> é append-only e cobre <em>todas</em> as
+      ações sensíveis (settings, mudanças, etc.). O handler de escrita
+      é <em>fail-safe</em>: falha de audit não quebra o fluxo principal
+      (<code>apps/api/src/audit.ts:23</code>).
+    </p>
+
+    <div class="code"><span class="c">// apps/api/src/audit.ts</span>
+<span class="k">try</span> {
+  <span class="k">await</span> prisma.auditEvent.create({ ... });
+} <span class="k">catch</span> {
+  <span class="c">// Audit must not break primary flows.</span>
+}</div>
+
+    <h3>3.6 Change Enablement (parcial) — workflow de aprovação reutilizável</h3>
+    <p>
+      <code>ApprovalRequest</code> já cobre três tipos: <code>ticket</code>
+      (ex. concluir), <code>hour_limit</code> (ampliar), <code>time_entry</code>
+      (lançamento). Aprovações são transacionais, idempotentes, e com
+      <em>decision note</em>. É a base certa para evoluir pra RFC formal.
+    </p>
+
+    <h3>3.7 Demand &amp; Capacity (parcial) — baseline por cliente</h3>
+    <p>
+      O conceito de baseline (horas contratadas/mês) já é primeira-classe:
+      <code>Client.baselineHoursMonth</code>, flag <code>countsTowardBaseline</code>
+      por ticket, e endpoint <code>getBillingSummary(clientId, from, to)</code>
+      que retorna <code>baselineRemaining</code> — exibido no overview
+      (KPI "Baseline restante").
+    </p>
+  </section>
+
+  <!-- ============================== GAPS ============================== -->
+  <section id="gaps">
+    <h2>4. Gaps por severidade <a class="anchor-link" href="#gaps">#</a></h2>
+
+    <p>
+      Severidade considera (a) impacto operacional se não-resolvido,
+      (b) frequência de uso, e (c) o que o mercado B2B2C tipicamente exige
+      como barreira de entrada. <strong>Critical</strong> = bloqueia
+      maturidade tática · <strong>High</strong> = precisa entrar no próximo
+      trimestre · <strong>Medium</strong> = polish tático · <strong>Low</strong>
+      = nice-to-have.
+    </p>
+
+    <h3><span class="pill pill-crit">Critical</span> — bloqueia maturidade tática</h3>
+
+    <details>
+      <summary><strong>C1.</strong> Sem dashboard de CSI / métricas táticas (MTTR, MTTA, FCR, change success, baseline burn, backlog aging)</summary>
+      <p>
+        Hoje o <code>OverviewPage</code> mostra: SLA cumprido, baseline
+        restante, horas pendentes, chamados ativos. Falta um painel
+        "Saúde do Serviço" com:
+      </p>
+      <ul>
+        <li><strong>MTTA</strong> (Mean Time To Acknowledge) — <code>firstResponseAt − createdAt</code> em horas úteis.</li>
+        <li><strong>MTTR</strong> (Mean Time To Resolve) — <code>resolvedAt − createdAt</code> em horas úteis.</li>
+        <li><strong>FCR</strong> (First Call Resolution) — % de tickets que saíram de <code>backlog</code> direto para <code>concluido</code> sem voltar pra <code>em_andamento</code>.</li>
+        <li><strong>Change success rate</strong> — % de aprovações <code>approved</code> vs <code>rejected</code> por <code>kind</code>.</li>
+        <li><strong>Baseline burn</strong> — soma de horas aprovadas <em>vs</em> baseline no mês, por cliente.</li>
+        <li><strong>Backlog aging</strong> — distribuição de idade de tickets abertos por bucket (1d, 3d, 7d, 30d).</li>
+      </ul>
+      <p>
+        <strong>Onde mora hoje:</strong>
+        <code>apps/api/src/reports.ts</code> só agrega por status. O cálculo
+        está espalhado em <code>sla-helpers.ts</code> e no
+        <code>OverviewPage</code>. Falta uma API
+        <code>GET /reports/service-health?period=...</code>.
+      </p>
+    </details>
+
+    <details>
+      <summary><strong>C2.</strong> Change Enablement é só "aprovar para concluir" — não é RFC</summary>
+      <p>
+        ITIL v5 separa "Change Enablement" (RFC com risco, plano, janela) de
+        "Change Control" (gatekeeping). Hoje <code>ApprovalRequest</code>
+        resolve só o lado do gatekeeping. Falta:
+      </p>
+      <ul>
+        <li>Entidade <code>Change</code> com <code>riskScore</code>, <code>rollbackPlan</code>, <code>windowStart/End</code>, <code>cabDecision</code>.</li>
+        <li>Vinculação Change → Ticket afetados (para mudar uma config, afeta N chamados).</li>
+        <li>Vinculação Change → Approvals já existentes.</li>
+        <li>Dashboard "Change Calendar" (semelhante ao Overview, mas com timeline de mudanças).</li>
+      </ul>
+      <p><strong>Arquivos a tocar:</strong> <code>schema.prisma</code> (modelo <code>Change</code>), <code>apps/api/src/</code> (novo <code>changes.ts</code>), <code>apps/web-staff/src/pages/</code> (nova <code>ChangesPage.tsx</code>).</p>
+    </details>
+
+    <details>
+      <summary><strong>C3.</strong> Problem Management é só um label — não há entidade Problem nem Known Error</summary>
+      <p>
+        <code>TicketType.problema</code> existe mas se comporta idêntico a
+        <code>incidente</code>. Não há:
+      </p>
+      <ul>
+        <li>Modelo <code>Problem</code> (id, title, rootCause, workAround, status <code>investigating / identified / known_error / closed</code>).</li>
+        <li>Vínculo <code>Incident ↔ Problem</code> (N:N).</li>
+        <li>Base de <strong>Known Errors</strong> (KEDB) — artigos com root cause, workaround, e link pra <em>Defect</em> que originou.</li>
+        <li>UI staff <code>/problems</code> com KEDB e link pro ticket.</li>
+      </ul>
+      <p>
+        <strong>Por que é Critical:</strong> sem Problem, vocês vão pagar
+        caro em incidentes repetidos. Em modelo B2B2C com 1-2 consultores
+        por cliente, o ticket-problema é a única forma de registrar
+        "causa raiz conhecida" e virar item da base de conhecimento.
+      </p>
+    </details>
+
+    <details>
+      <summary><strong>C4.</strong> Knowledge Management é só "link externo"</summary>
+      <p>
+        <code>knowledgeBaseUrl</code> aponta pra fora. Pra B2B2C isso é
+        subótimo: (a) tira a marca da consultoria, (b) KB não tem
+        contexto do ticket, (c) o que é "Knowledge" no ITIL inclui artigos
+        vinculados a tickets, problemas, e procedimentos.
+      </p>
+      <p>
+        <strong>Esboço de solução:</strong> entidade <code>Article</code>
+        com <code>title</code>, <code>body</code> (markdown), <code>category</code>,
+        <code>linkedTicketKeys</code> (M:N), <code>linkedProblemIds</code> (M:N),
+        <code>visibleToClient</code>, e <em>workflow</em> de publicação
+        (rascunho → publicado).
+      </p>
+    </details>
+
+    <h3><span class="pill pill-high">High</span> — entra no próximo trimestre</h3>
+
+    <details>
+      <summary><strong>H1.</strong> Service Catalog precisa virar "Service Offering" (entidade)</summary>
+      <p>
+        Hoje o catálogo é uma enum + módulo. ITIL v5 fala em
+        <em>Service Offering</em>: nome, descrição, prazo (SLA), custo,
+        aprovação requerida, status (ativo/em construção/descontinuado).
+      </p>
+      <p>
+        <strong>Modelo proposto:</strong>
+        <code>ServiceOffering</code> com FK <code>organizationId</code>,
+        <code>name</code>, <code>description</code>, <code>slaPolicyId</code>
+        (referência a <code>SlaPolicy</code>), <code>requiresApproval</code>,
+        <code>status</code>, <code>version</code>. Substitui a enum
+        <code>TicketType</code> na criação de tickets.
+      </p>
+    </details>
+
+    <details>
+      <summary><strong>H2.</strong> Sem Major Incident process</summary>
+      <p>
+        Quando um incidente crítico paralisa um cliente (ex: sistema fora),
+        ITIL exige Major Incident: comunicado, war room, post-mortem.
+        Hoje <code>priority: "critica"</code> só muda a cor.
+      </p>
+      <p>
+        <strong>Esboço:</strong> flag <code>isMajor</code> em <code>Ticket</code>,
+        template de "comunicado de major" (e-mail em massa pros stakeholders
+        do cliente), página dedicada <code>/majors</code> com timeline.
+      </p>
+    </details>
+
+    <details>
+      <summary><strong>H3.</strong> Backlog aging visível</summary>
+      <p>
+        "Chamados ativos" hoje não diz <em>quais</em> estão envelhecendo.
+        Falta um widget de aging por bucket (0-1d, 1-3d, 3-7d, 7-30d, 30d+)
+        com drill-down e link pra "stale" (sem update há N dias).
+      </p>
+    </details>
+
+    <details>
+      <summary><strong>H4.</strong> Sem workflow de "Problem → Change"</summary>
+      <p>
+        Quando um Problem é identificado e precisa de um fix de
+        infraestrutura, deve virar uma <em>Change</em> com janela,
+        CAB, etc. Sem essa ligação, vocês têm "Problema" + "Change" como
+        silos. ITIL chama isso de "problem-to-change workflow".
+      </p>
+    </details>
+
+    <details>
+      <summary><strong>H5.</strong> Visibilidade ITIL pros consultores</summary>
+      <p>
+        O portal cliente tem o painel "Acompanhamento" (chamados abertos,
+        SLA do mês, última atualização) — bom. Mas falta do lado
+        <em>staff</em> o painel "Saúde do Serviço" (C1) e o "Calendário de
+        Mudanças" (C2). Hoje a navegação staff não tem nenhuma página
+        dedicada a visão ITIL.
+      </p>
+    </details>
+
+    <h3><span class="pill pill-warn">Medium</span> — polish tático</h3>
+
+    <details>
+      <summary><strong>M1.</strong> CSAT pós-resolução</summary>
+      <p>
+        Cliente fecha o chamado, recebe e-mail "Como foi? 1-5 ⭐" com link
+        pra rota <code>/tickets/{key}/feedback?score=N</code>. Hoje nada.
+        <code>Notification</code> + <code>Ticket</code> (campo
+        <code>csatScore</code> + <code>csatComment</code>).
+      </p>
+    </details>
+
+    <details>
+      <summary><strong>M2.</strong> Exportação CSV/Excel dos relatórios</summary>
+      <p>
+        <code>ticketsReport</code> retorna JSON. Pra PMO, é CSV/Excel.
+        <code>GET /reports/service-health.csv?period=...</code>.
+      </p>
+    </details>
+
+    <details>
+      <summary><strong>M3.</strong> SLA warning por e-mail (já no P2 do docs)</summary>
+      <p>
+        Faltam apenas dois eventos na matriz <code>NotificationPrefs</code>:
+        <code>ticket.sla_warning</code> (ex: 80% do prazo consumido) e
+        <code>ticket.sla_breached</code>. Scheduler simples (cron a cada
+        15 min) que varre tickets com <code>slaDueAt</code> próximo.
+      </p>
+    </details>
+
+    <details>
+      <summary><strong>M4.</strong> Recalcular SLA em massa já existe; falta versionar</summary>
+      <p>
+        <code>recalculateOpenSlaHandler</code> existe em
+        <code>apps/api/src/sla.ts:347</code>. Falta versionar a
+        alteração (audit) e mostrar a UI "Última recálculo: ..." no
+        <code>/settings/sla</code>.
+      </p>
+    </details>
+
+    <details>
+      <summary><strong>M5.</strong> SLA "por service offering" (não só por cliente)</summary>
+      <p>
+        Hoje: SLA por (cliente, prioridade). ITIL sugere SLA também por
+        <em>tipo de serviço</em>. Ex: "Incident = 4h úteis; Service
+        Request = 1 dia útil; Problem = 5 dias úteis". Isso muda a forma
+        de contratar.
+      </p>
+    </details>
+
+    <h3><span class="pill pill-muted">Low</span> — nice-to-have</h3>
+
+    <details>
+      <summary><strong>L1.</strong> Risk register (entidade <code>Risk</code>)</summary>
+      <p>Risk com <code>score</code>, <code>mitigation</code>, <code>owner</code>, <code>status</code>. Útil para board.</p>
+    </details>
+    <details>
+      <summary><strong>L2.</strong> NPS trimestral</summary>
+      <p>Similar ao CSAT, com cadência maior.</p>
+    </details>
+    <details>
+      <summary><strong>L3.</strong> Capacidade (Capacity &amp; Performance)</summary>
+      <p>Forecast de horas vs baseline no próximo trimestre.</p>
+    </details>
+    <details>
+      <summary><strong>L4.</strong> Uptime do próprio portal</summary>
+      <p>Pra vender SLA de "99,5% do portal no ar", é preciso medir. <code>UptimeRobot</code> free ou BetterStack.</p>
+    </details>
+    <details>
+      <summary><strong>L5.</strong> Continuar com o <code>JWT</code> em localStorage é risco XSS</summary>
+      <p>Documentado em <code>docs/security.md</code>. Mover pra <code>httpOnly</code> + <code>SameSite=Lax</code> cookie. <em>Não é ITIL puro, mas é blocker de Information Security Management.</em></p>
+    </details>
+  </section>
+
+  <!-- ============================== ROADMAP ============================== -->
+  <section id="roadmap">
+    <h2>5. Roadmap priorizado — 4 ondas <a class="anchor-link" href="#roadmap">#</a></h2>
+
+    <p>
+      Cada onda é um ciclo autônomo, com entregável claro. Esforço é em
+      <em>dias-pessoa</em> (DP) considerando o time atual (1-2 pessoas,
+      conforme observado em <code>user_profile</code> e na estrutura do
+      monorepo).
+    </p>
+
+    <div class="grid grid-2">
+      <div class="card">
+        <h3>Onda 0 — Quick wins táticos (1-2 semanas · 4-6 DP)</h3>
+        <p class="small">Sem mudança de schema. Toca em UI + endpoints já existentes.</p>
+        <ul>
+          <li><strong>QW1.</strong> Endpoint <code>GET /reports/service-health</code> com MTTA, MTTR, FCR, change success, baseline burn, backlog aging (3-4 DP)</li>
+          <li><strong>QW2.</strong> Nova página staff <code>/reports/health</code> consumindo QW1 com cards/gráficos (2 DP)</li>
+          <li><strong>QW3.</strong> CSAT pós-resolução: e-mail + 1 endpoint <code>POST /tickets/{key}/feedback</code> + campo <code>csatScore</code> no schema (1-2 DP)</li>
+          <li><strong>QW4.</strong> Aging widget no <code>OverviewPage</code> com drill-down (1 DP)</li>
+        </ul>
+        <p><strong>Entregável:</strong> dashboard "Saúde do Serviço" + CSAT ao vivo.</p>
+      </div>
+
+      <div class="card">
+        <h3>Onda 1 — Problem + Change (4-6 semanas · 12-18 DP)</h3>
+        <p class="small">Schema novo. Modelagem cuidadosa. É a fundação ITIL v5 madura.</p>
+        <ul>
+          <li><strong>W1.1.</strong> Modelo <code>Problem</code> + migração + <code>Incident.problemId</code> (3 DP)</li>
+          <li><strong>W1.2.</strong> API REST <code>/problems</code> + UI staff <code>/problems</code> (3 DP)</li>
+          <li><strong>W1.3.</strong> Modelo <code>Change</code> (RFC) com risk, window, rollback, CAB (3 DP)</li>
+          <li><strong>W1.4.</strong> API REST <code>/changes</code> + UI <code>/changes</code> + Change Calendar widget (4 DP)</li>
+          <li><strong>W1.5.</strong> Workflow "Problem → Change" — botão no Problem que cria Change com campos pré-preenchidos (2 DP)</li>
+        </ul>
+        <p><strong>Entregável:</strong> Problem Management e Change Enablement vivos, com linkage Problem↔Change↔Incident.</p>
+      </div>
+
+      <div class="card">
+        <h3>Onda 2 — Knowledge + Service Offering (4-6 semanas · 10-15 DP)</h3>
+        <p class="small">Substitui a enum <code>TicketType</code> por entidade. Cuidado com migração.</p>
+        <ul>
+          <li><strong>W2.1.</strong> Modelo <code>Article</code> (markdown) + estado <code>draft / published</code> (3 DP)</li>
+          <li><strong>W2.2.</strong> UI staff <code>/knowledge</code> (lista, busca, edição) + UI cliente embutida no detalhe do ticket (3 DP)</li>
+          <li><strong>W2.3.</strong> Modelo <code>ServiceOffering</code> + migração (deixar <code>TicketType</code> como legado por 1 release) (3 DP)</li>
+          <li><strong>W2.4.</strong> UI staff <code>/settings/catalog</code> reformulada: lista de Service Offerings em vez de toggles (3 DP)</li>
+          <li><strong>W2.5.</strong> Portal cliente renderiza catálogo público de offerings (2 DP)</li>
+        </ul>
+        <p><strong>Entregável:</strong> KEDB interna + catálogo de serviços formal com SLA por oferta.</p>
+      </div>
+
+      <div class="card">
+        <h3>Onda 3 — Maturidade tática contínua (ongoing · 2-3 DP/mês)</h3>
+        <p class="small">Não é projeto, é prática. CSI + security + compliance.</p>
+        <ul>
+          <li><strong>W3.1.</strong> SLA warning/breach por e-mail (scheduler +2 eventos na matriz) — mover do P2 docs (2 DP)</li>
+          <li><strong>W3.2.</strong> Export CSV/Excel dos relatórios (1 DP)</li>
+          <li><strong>W3.3.</strong> Migrar JWT pra cookie <code>httpOnly</code> + <code>SameSite=Lax</code> (1-2 DP)</li>
+          <li><strong>W3.4.</strong> Risk register (entidade <code>Risk</code>) — opcional mas valioso pra board (2 DP)</li>
+          <li><strong>W3.5.</strong> Revisão trimestral de CSI: atas, action plan, retro (processo, não código)</li>
+        </ul>
+        <p><strong>Entregável:</strong> cadência tática ITIL v5 mantida.</p>
+      </div>
+    </div>
+
+    <div class="callout">
+      <strong>Recomendação de início:</strong> Onda 0 (quick wins) traz
+      visibilidade imediata com baixíssimo risco — é onde o ROI aparece
+      em 1-2 semanas. Onda 1 (Problem + Change) é o "salto de maturidade"
+      que diferencia SaaS amador de ITSM sério. Onda 2 é o que transforma
+      vocês em plataforma, não só ferramenta.
+    </div>
+  </section>
+
+  <!-- ============================== MÉTRICAS ============================== -->
+  <section id="metricas">
+    <h2>6. Métricas táticas — o que medir e como <a class="anchor-link" href="#metricas">#</a></h2>
+
+    <p>
+      Quatro famílias. Todas já podem ser calculadas com dados existentes
+      no banco. Faltam só o endpoint e a UI (Onda 0).
+    </p>
+
+    <h3>6.1 Indicadores de suporte (Incident &amp; Request)</h3>
+    <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Métrica</th><th>Fórmula (resumo)</th><th>Origem dos dados</th><th>Onde exibir</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>MTTA</strong> (Mean Time To Acknowledge)</td>
+          <td>mediana(<code>firstResponseAt − createdAt</code>) em horas úteis</td>
+          <td><code>Ticket.firstResponseAt</code>, <code>createdAt</code></td>
+          <td>Cards do Overview + dashboard Health</td>
+        </tr>
+        <tr>
+          <td><strong>MTTR</strong> (Mean Time To Resolve)</td>
+          <td>mediana(<code>resolvedAt − createdAt</code>) em horas úteis</td>
+          <td><code>Ticket.resolvedAt</code></td>
+          <td>Overview + Health</td>
+        </tr>
+        <tr>
+          <td><strong>FCR</strong> (First Call Resolution)</td>
+          <td>% de tickets que saíram de <code>backlog</code> → <code>concluido</code> sem voltar a <code>em_andamento</code></td>
+          <td><code>TicketStatusHistory</code></td>
+          <td>Health + por módulo/equipe</td>
+        </tr>
+        <tr>
+          <td><strong>% SLA cumprido</strong></td>
+          <td>tickets resolvidos dentro do prazo / total</td>
+          <td><code>sla-helpers.computePeriodSlaPct</code> — já existe</td>
+          <td>Já em Overview + Home cliente</td>
+        </tr>
+        <tr>
+          <td><strong>Backlog aging</strong></td>
+          <td>bucket de <code>now − createdAt</code> para tickets abertos</td>
+          <td><code>Ticket.createdAt</code></td>
+          <td>Health (histograma)</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h3>6.2 Indicadores de mudança (Change Enablement)</h3>
+    <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Métrica</th><th>Fórmula</th><th>Origem</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Change success rate</strong></td>
+          <td>approvals <code>approved</code> ÷ (<code>approved</code> + <code>rejected</code>) por <code>kind</code></td>
+          <td><code>ApprovalRequest.status</code> (já existe)</td>
+        </tr>
+        <tr>
+          <td><strong>Unauthorized change</strong></td>
+          <td>tickets que mudaram de <code>concluido</code> → outro status (reativação não-aprovada)</td>
+          <td><code>TicketStatusHistory</code></td>
+        </tr>
+        <tr>
+          <td><strong>Tempo médio de aprovação</strong></td>
+          <td><code>decidedAt − createdAt</code> por <code>ApprovalRequest</code></td>
+          <td><code>ApprovalRequest</code></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h3>6.3 Indicadores de capacidade &amp; demanda</h3>
+    <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Métrica</th><th>Fórmula</th><th>Origem</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Baseline burn</strong></td>
+          <td>soma de <code>TimeEntry.seconds</code> <em>aprovados</em> ÷ <code>Client.baselineHoursMonth</code> por cliente/mês</td>
+          <td><code>TimeEntry</code>, <code>Client</code></td>
+        </tr>
+        <tr>
+          <td><strong>Esforço por cliente</strong></td>
+          <td>agrupado por <code>clientId</code> + tipo de ticket</td>
+          <td><code>TimeEntry</code> × <code>Ticket</code></td>
+        </tr>
+        <tr>
+          <td><strong>Esforço por consultor</strong></td>
+          <td>agrupado por <code>userId</code> + <code>hourRateFactor</code></td>
+          <td><code>TimeEntry</code>, <code>User.hourRateFactor</code></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h3>6.4 Indicadores de cliente (Relationship)</h3>
+    <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Métrica</th><th>Fórmula</th><th>Origem</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>CSAT</strong></td>
+          <td>média de <code>Ticket.csatScore</code> por período (Onda 0 — QW3)</td>
+          <td><code>Ticket.csatScore</code> (a criar)</td>
+        </tr>
+        <tr>
+          <td><strong>Tickets por cliente</strong></td>
+          <td>contagem agrupada por <code>clientId</code> + status</td>
+          <td><code>Ticket.clientId</code></td>
+        </tr>
+        <tr>
+          <td><strong>Top clientes por demanda</strong></td>
+          <td>top-10 por <code>count(ticket)</code> no período</td>
+          <td><code>Ticket</code></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+
+    <div class="callout">
+      <strong>Dica de produto:</strong> já que vocês têm <em>dois</em>
+      portais (cliente e staff) com auth segregada, é natural que a UI
+      cliente mostre um subconjunto de métricas (CSAT, %SLA do mês,
+      chamados abertos) e a UI staff mostre tudo. Não misturem os
+      endpoints — <code>GET /reports/*</code> é staff, <code>GET /portal/*</code>
+      é cliente.
+    </div>
+  </section>
+
+  <!-- ============================== ARQUITETURA ============================== -->
+  <section id="arquitetura">
+    <h2>7. Mapa de mudanças arquiteturais sugeridas <a class="anchor-link" href="#arquitetura">#</a></h2>
+
+    <h3>7.1 Diagrama de domínio (visão futura)</h3>
+    <div class="diagram">
+      <div class="lane">
+        <span class="node"><strong>Organization</strong><br/>multi-tenant</span>
+        <span class="arrow">→</span>
+        <span class="node"><strong>Client</strong><br/>baseline, rate</span>
+        <span class="arrow">→</span>
+        <span class="node"><strong>Project</strong><br/>entrega</span>
+        <span class="arrow">→</span>
+        <span class="node"><strong>ServiceOffering</strong><br/>catálogo + SLA</span>
+      </div>
+      <div class="lane">
+        <span class="node"><strong>SLA Policy</strong><br/>horas úteis</span>
+        <span class="arrow">↔</span>
+        <span class="node"><strong>Holiday</strong><br/>por org</span>
+        <span class="arrow">→</span>
+        <span class="node"><strong>slaDueAt</strong></span>
+      </div>
+      <div class="lane">
+        <span class="node"><strong>Ticket</strong><br/>type, priority, status</span>
+        <span class="arrow">↔</span>
+        <span class="node"><strong>Problem</strong><br/>causa raiz</span>
+        <span class="arrow">↔</span>
+        <span class="node"><strong>Change</strong><br/>RFC, risk, CAB</span>
+        <span class="arrow">↔</span>
+        <span class="node"><strong>Article</strong><br/>KEDB</span>
+      </div>
+      <div class="lane">
+        <span class="node"><strong>TimeEntry</strong><br/>aprovação</span>
+        <span class="arrow">→</span>
+        <span class="node"><strong>Approval</strong><br/>gate</span>
+        <span class="arrow">→</span>
+        <span class="node"><strong>Audit</strong><br/>trilha</span>
+      </div>
+    </div>
+
+    <h3>7.2 Mudanças no <code>schema.prisma</code> (resumo)</h3>
+    <div class="code"><span class="c">// Novos modelos propostos (resumo)</span>
+
+model <span class="p">Problem</span> {
+  id              String   @id @default(uuid())
+  organizationId  String
+  title           String
+  status          ProblemStatus  <span class="c">// investigating | identified | known_error | closed</span>
+  rootCause       String?
+  workAround      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  organization    Organization @relation(...)
+  incidents       IncidentLink[]
+  changes         Change[]
+  articles        Article[]      @relation(<span class="s">"ProblemArticles"</span>)
+}
+
+model <span class="p">Change</span> {
+  id              String   @id @default(uuid())
+  organizationId  String
+  title           String
+  status          ChangeStatus  <span class="c">// draft | pending_cab | approved | rejected | implementing | completed | failed</span>
+  riskScore       Int      <span class="c">// 1..5</span>
+  rollbackPlan    String?
+  windowStart     DateTime?
+  windowEnd       DateTime?
+  cabDecision     String?
+  cabDecisionAt   DateTime?
+  problemId       String?
+  organization    Organization @relation(...)
+  problem         Problem? @relation(fields: [problemId], references: [id])
+  ticketKeys      String[]      <span class="c">// denormalized; ou M:N via ChangeTicket</span>
+  approvals       ApprovalRequest[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model <span class="p">Article</span> {
+  id              String   @id @default(uuid())
+  organizationId  String
+  title           String
+  body            String
+  category        ArticleCategory
+  status          ArticleStatus  <span class="c">// draft | published | archived</span>
+  visibleToClient Boolean  @default(false)
+  problemId       String?
+  organization    Organization @relation(...)
+  problem         Problem? @relation(<span class="s">"ProblemArticles"</span>, fields: [problemId], references: [id])
+  ticketKeys      String[]      <span class="c">// M:N via ArticleTicket</span>
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model <span class="p">ServiceOffering</span> {
+  id              String   @id @default(uuid())
+  organizationId  String
+  name            String
+  description     String
+  slaPolicyId     String?
+  requiresApproval Boolean @default(false)
+  status          OfferingStatus  <span class="c">// active | draft | retired</span>
+  version         Int      @default(1)
+  organization    Organization @relation(...)
+  slaPolicy       SlaPolicy? @relation(...)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}</div>
+
+    <h3>7.3 Endpoints novos propostos</h3>
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>Método</th><th>Rota</th><th>Função</th></tr></thead>
+      <tbody>
+        <tr><td>GET</td><td><code>/reports/service-health?period=current_month</code></td><td>MTTA, MTTR, FCR, change success, baseline burn, aging</td></tr>
+        <tr><td>GET</td><td><code>/reports/service-health.csv</code></td><td>Export CSV</td></tr>
+        <tr><td>POST</td><td><code>/tickets/:key/feedback</code></td><td>CSAT (cliente)</td></tr>
+        <tr><td>GET/POST/PATCH</td><td><code>/problems</code> e <code>/problems/:id</code></td><td>Problem CRUD</td></tr>
+        <tr><td>POST</td><td><code>/problems/:id/incidents</code></td><td>Vincular incidente</td></tr>
+        <tr><td>GET/POST/PATCH</td><td><code>/changes</code> e <code>/changes/:id</code></td><td>Change CRUD</td></tr>
+        <tr><td>POST</td><td><code>/changes/:id/cab</code></td><td>Decisão CAB</td></tr>
+        <tr><td>GET/POST/PATCH</td><td><code>/knowledge</code> e <code>/knowledge/:id</code></td><td>Article CRUD</td></tr>
+        <tr><td>GET</td><td><code>/portal/knowledge?category=...</code></td><td>Lista pública (cliente)</td></tr>
+        <tr><td>GET/POST/PATCH</td><td><code>/settings/catalog/offerings</code></td><td>Service Offering CRUD (substitui <code>enabledTicketTypes</code>)</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h3>7.4 Páginas novas na UI staff</h3>
+    <ul>
+      <li><code>/reports/health</code> — dashboard de CSI</li>
+      <li><code>/problems</code> e <code>/problems/:id</code> — lista e detalhe</li>
+      <li><code>/changes</code> e <code>/changes/:id</code> — change calendar e detalhe</li>
+      <li><code>/knowledge</code> — editor de artigos</li>
+      <li><code>/settings/catalog</code> reformulada: lista de Service Offerings</li>
+    </ul>
+  </section>
+
+  <!-- ============================== GLOSSÁRIO ============================== -->
+  <section id="glossario">
+    <h2>8. Glossário ITIL v5 → nomenclatura atual <a class="anchor-link" href="#glossario">#</a></h2>
+
+    <p>
+      ITIL v5 (fevereiro 2025) reorganizou práticas. A tabela a seguir
+      é a ponte que eu recomendo oficializar nos tooltips do produto
+      e na doc — pra equipe e clientes falarem a mesma língua.
+    </p>
+
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>ITIL v5</th><th>Vocabulário atual do produto</th><th>Arquivo/rota</th></tr></thead>
+      <tbody>
+        <tr><td>Service consumer</td><td>Cliente (do <code>Client</code>), usuário cliente</td><td><code>apps/api/src/clients.ts</code></td></tr>
+        <tr><td>Service provider</td><td>Consultoria (do <code>Organization</code>)</td><td><code>schema.prisma:Organization</code></td></tr>
+        <tr><td>Service Desk</td><td>Portal cliente + portal staff (ponto único de contato)</td><td><code>apps/web-client/</code>, <code>apps/web-staff/</code></td></tr>
+        <tr><td>Incident</td><td><code>Ticket</code> com <code>ticketType: "incidente"</code></td><td><code>schema.prisma:TicketType</code></td></tr>
+        <tr><td>Service request</td><td><code>Ticket</code> com <code>ticketType: "duvida" | "melhoria" | "problema"</code></td><td><code>schema.prisma:TicketType</code></td></tr>
+        <tr><td>Problem</td><td><em>a criar</em> (modelo Problem)</td><td>—</td></tr>
+        <tr><td>Known Error</td><td><em>a criar</em> (Article status <code>published</code>, vinculado a Problem)</td><td>—</td></tr>
+        <tr><td>Change (RFC)</td><td><em>a criar</em> (modelo Change)</td><td>—</td></tr>
+        <tr><td>Approval</td><td><code>ApprovalRequest</code> (gate de change/release)</td><td><code>apps/api/src/approvals.ts</code></td></tr>
+        <tr><td>Service catalog</td><td><code>OrganizationSettings.enabledTicketTypes</code> + <code>TicketModuleCatalog</code> → <em>evoluir para</em> <code>ServiceOffering</code></td><td><code>apps/api/src/settings.ts</code></td></tr>
+        <tr><td>Service level agreement</td><td><code>SlaPolicy</code> por (cliente, prioridade)</td><td><code>apps/api/src/sla.ts</code></td></tr>
+        <tr><td>Configuration Item (CI)</td><td>Implícito em <code>Client</code>, <code>Project</code>, <code>Tag</code> — <em>evoluir para</em> entidade CI</td><td>—</td></tr>
+        <tr><td>CMDB</td><td><em>a criar</em> (registro de CIs por org)</td><td>—</td></tr>
+        <tr><td>Workaround</td><td><em>a criar</em> (campo em Problem)</td><td>—</td></tr>
+        <tr><td>Major Incident</td><td><em>a criar</em> (flag em Ticket + workflow)</td><td>—</td></tr>
+        <tr><td>Knowledge article</td><td><em>a criar</em> (modelo Article + KEDB)</td><td>—</td></tr>
+        <tr><td>Baseline</td><td><code>Client.baselineHoursMonth</code> (horas contratadas/mês)</td><td><code>schema.prisma:Client</code></td></tr>
+        <tr><td>Time entry</td><td><code>TimeEntry</code> (lançamento de horas)</td><td><code>schema.prisma:TimeEntry</code></td></tr>
+        <tr><td>SLA target</td><td><code>OrganizationSettings.slaTargetPct</code></td><td><code>schema.prisma:OrganizationSettings</code></td></tr>
+        <tr><td>Holiday</td><td><code>OrganizationHoliday</code></td><td><code>schema.prisma:OrganizationHoliday</code></td></tr>
+        <tr><td>Audit event</td><td><code>AuditEvent</code></td><td><code>schema.prisma:AuditEvent</code></td></tr>
+        <tr><td>Internal note</td><td><code>Comment.visibility = "internal"</code></td><td><code>schema.prisma:CommentVisibility</code></td></tr>
+        <tr><td>Notification preference</td><td><code>OrganizationSettings.notificationPrefsJson</code> + <code>defaultNotificationPrefs()</code></td><td><code>packages/shared/src/schemas.ts</code></td></tr>
+        <tr><td>Public comment</td><td><code>Comment.visibility = "public"</code></td><td><code>schema.prisma:CommentVisibility</code></td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <div class="callout">
+      <strong>Ação recomendada:</strong> adicionar uma coluna <em>"Equivalente ITIL v5"</em>
+      em <code>docs/settings.md</code> e criar <code>docs/itil-glossary.md</code> com
+      a tabela acima. Custa 1h e padroniza conversa com cliente enterprise.
+    </div>
+  </section>
+
+  <!-- ============================== RISCOS ============================== -->
+  <section id="riscos">
+    <h2>9. Riscos e anti-padrões a evitar <a class="anchor-link" href="#riscos">#</a></h2>
+
+    <details>
+      <summary><strong>R1.</strong> Implementar Problem Management sem Change Enablement (vice-versa)</summary>
+      <p>
+        Os dois precisam nascer juntos. Sem Change, Problem vira "ticket
+        de reclamação eterna". Sem Problem, Change vira "deploy sem causa
+        raiz". Implementem na Onda 1 inteira.
+      </p>
+    </details>
+
+    <details>
+      <summary><strong>R2.</strong> Migrar enum <code>TicketType</code> para <code>ServiceOffering</code> sem faseamento</summary>
+      <p>
+        Tem cliente com 200 tickets legados usando <code>incidente</code>.
+        Quebre em duas releases: (1) adiciona <code>ServiceOffering</code>
+        sem remover a enum; (2) migra formulário; (3) depreca a enum
+        como filtro de "legacy" no relatório.
+      </p>
+    </details>
+
+    <details>
+      <summary><strong>R3.</strong> Knowledge com edição livre pelos consultores sem curadoria</summary>
+      <p>
+        KEDB sem workflow vira wiki abandonada. ITIL recomenda
+        <em>Knowledge Curator</em>. Implemente <code>status: draft / published</code>
+        desde o dia 1, com aprovação do gestor antes de virar visível
+        ao cliente.
+      </p>
+    </details>
+
+    <details>
+      <summary><strong>R4.</strong> Excesso de métricas (vanity metrics)</summary>
+      <p>
+        Métrica que não muda decisão é ruído. As 4 famílias do
+        <a href="#metricas">cap. 6</a> cobrem o que importa taticamente.
+        Resistam a adicionar "ticket médio por hora do dia" — não leva
+        a ação.
+      </p>
+    </details>
+
+    <details>
+      <summary><strong>R5.</strong> "Mudar pra virar ITIL" sem onboarding do cliente</summary>
+      <p>
+        Cliente acostumado a "abrir ticket" pode estranhar o "Service
+        Catalog com offerings". ITIL v5 é uma promessa de transparência,
+        mas a UX precisa continuar simples. O catálogo novo entra
+        <em>atrás</em> do botão "Abrir chamado" — não substitui.
+      </p>
+    </details>
+
+    <details>
+      <summary><strong>R6.</strong> Esquecer de auditar as novas entidades</summary>
+      <p>
+        Toda ação de escrita em <code>Problem</code>, <code>Change</code>,
+        <code>Article</code> deve gerar <code>AuditEvent</code>. Vocês já
+        têm o padrão; basta replicar o padrão de <code>writeAudit(...)</code>
+        dos handlers de <code>settings.ts</code>.
+      </p>
+    </details>
+  </section>
+
+  <!-- ============================== APÊNDICE ============================== -->
+  <section id="apendice">
+    <h2>10. Apêndice — arquivos auditados <a class="anchor-link" href="#apendice">#</a></h2>
+
+    <h3>Backend (API)</h3>
+    <ul>
+      <li><code>apps/api/prisma/schema.prisma</code> — 13 modelos + 4 enums ITIL-friendly</li>
+      <li><code>apps/api/src/index.ts</code></li>
+      <li><code>apps/api/src/auth.ts</code></li>
+      <li><code>apps/api/src/permissions.ts</code> — <code>isStaff</code>, <code>canManageSettings</code>, <code>canManageProjects</code></li>
+      <li><code>apps/api/src/tickets.ts</code> — 318 linhas, fluxo de criação/PATCH com SLA</li>
+      <li><code>apps/api/src/sla.ts</code> — 408 linhas, motor de SLA + policies + recalcular em massa</li>
+      <li><code>apps/api/src/sla-calc.ts</code> — cálculo puro de horas úteis</li>
+      <li><code>apps/api/src/approvals.ts</code> — 3 kinds de aprovação</li>
+      <li><code>apps/api/src/projects.ts</code> — CRUD simples (entidade <code>Project</code>)</li>
+      <li><code>apps/api/src/settings.ts</code> — 11 endpoints de settings (perfil, SLA, catálogo, e-mail, notificações, portal, holidays, modules, logo)</li>
+      <li><code>apps/api/src/audit.ts</code> — write audit fail-safe</li>
+      <li><code>apps/api/src/reports.ts</code> — ticketsReport (status, assignee)</li>
+      <li><code>apps/api/src/ticket-history.ts</code> — registro de mudanças de status</li>
+      <li><code>apps/api/src/ticket-notifications.ts</code></li>
+      <li><code>apps/api/src/attachments.ts</code>, <code>billing.ts</code>, <code>clients.ts</code>, <code>comments.ts</code>, <code>db.ts</code>, <code>hardening.ts</code>, <code>invites.ts</code>, <code>mail.ts</code>, <code>notifications.ts</code>, <code>openapi.ts</code>, <code>organizations.ts</code>, <code>password-reset.ts</code>, <code>privacy.ts</code>, <code>search.ts</code>, <code>storage.ts</code>, <code>sync.ts</code>, <code>tags.ts</code>, <code>time-entries.ts</code>, <code>users.ts</code></li>
+    </ul>
+
+    <h3>Shared (UI types + lógica)</h3>
+    <ul>
+      <li><code>packages/shared/src/index.ts</code></li>
+      <li><code>packages/shared/src/schemas.ts</code> — 16 schemas Zod, base ITIL</li>
+      <li><code>packages/shared/src/sla-helpers.ts</code> — funções puras de cálculo de SLA por período</li>
+    </ul>
+
+    <h3>UI staff (consultoria)</h3>
+    <ul>
+      <li><code>apps/web-staff/src/pages/OverviewPage.tsx</code> — 4 KPIs ITIL (chamados ativos, SLA cumprido, baseline restante, horas pendentes)</li>
+      <li><code>apps/web-staff/src/pages/SlaPoliciesPage.tsx</code> — 480 linhas: políticas + holidays + recálculo</li>
+      <li><code>apps/web-staff/src/pages/ApprovalsPage.tsx</code> — fila + criação de solicitações</li>
+      <li><code>apps/web-staff/src/pages/ReportsPage.tsx</code> — relatório por status/assignee</li>
+      <li><code>apps/web-staff/src/pages/MasterPage.tsx</code> — console plataforma</li>
+      <li><code>apps/web-staff/src/pages/TicketDetailPage.tsx</code> — 600+ linhas, com SLA badge, tags, horas, anexos, comments</li>
+      <li><code>apps/web-staff/src/pages/settings/*</code> — 9 páginas de settings (Organization, Catalog, Sla, Email, Notification, Portal, Privacy, Audit, Users, Projects)</li>
+    </ul>
+
+    <h3>UI cliente</h3>
+    <ul>
+      <li><code>apps/web-client/src/pages/ClientHomePage.tsx</code> — hero, "Acompanhamento" (SLA do mês), categorias ITIL, KB</li>
+      <li><code>apps/web-client/src/pages/TicketDetailPage.tsx</code> — cliente vê SLA badge, business hours, anexos, comments</li>
+      <li><code>apps/web-client/src/lib/usePortalSettings.ts</code> — consome <code>GET /portal/settings</code></li>
+    </ul>
+
+    <h3>App desktop (Tauri/Rust)</h3>
+    <ul>
+      <li><code>SpecDriven/src/features/tickets/TicketDetailPage.tsx</code> — offline, com checklist, EF/ET/TU docs, timer</li>
+      <li><code>SpecDriven/src/features/dashboard/DashboardPage.tsx</code> — overview local</li>
+      <li><code>SpecDriven/src/features/reports/TicketsReportPage.tsx</code> — relatório local</li>
+      <li><code>SpecDriven/src-tauri/src/commands/tickets.ts</code>, <code>hours_report.ts</code>, <code>notes.ts</code>, <code>timer.ts</code>, <code>checklist.ts</code>, <code>attachments.ts</code>, <code>documents.ts</code>, <code>cloud_sync.ts</code></li>
+    </ul>
+
+    <h3>Documentação institucional</h3>
+    <ul>
+      <li><code>docs/README.md</code> — índice</li>
+      <li><code>docs/go-live-checklist.md</code> — P0 (secrets, storage, deploy, smoke) + P1 + P2</li>
+      <li><code>docs/settings.md</code> — hub de configurações</li>
+      <li><code>docs/security.md</code> — auth, JWT localStorage, SMTP, LGPD</li>
+      <li><code>docs/guia-instalacao.md</code> — onboarding operacional</li>
+    </ul>
+
+    <h3>Migrations relevantes</h3>
+    <ul>
+      <li><code>20260713143000_add_master_admin_roles_and_projects</code> — admin + project</li>
+      <li><code>20260713152200_add_ticket_company_name_and_module</code> — module em ticket</li>
+      <li><code>20260713160000_add_organization_settings</code> — Sprint 1 (settings)</li>
+      <li><code>20260713170000_add_catalog_settings</code> — Sprint 2 (catálogo)</li>
+      <li><code>20260713180000_add_sla_advanced_settings</code> — Sprint 4 (SLA + holidays)</li>
+      <li><code>20260713200000_go_live_extras</code></li>
+      <li><code>20260713210000_portal_smtp_hero</code></li>
+    </ul>
+  </section>
+
+  <div class="footer">
+    <p>
+      Documento gerado em 13/07/2026 a partir de auditoria de código do
+      monorepo <code>specdriven-platform</code> e do app <code>SpecDriven</code>.
+      Versão: 1.0 · ITIL v5 Foundation.
+    </p>
+    <p>
+      Próximos passos sugeridos: validar este diagnóstico contigo, escolher
+      a Onda 0 (quick wins) para começar, e abrir uma issue por item
+      <em>Critical</em> no repositório.
+    </p>
+  </div>
+
+</div>
+</body>
+</html>

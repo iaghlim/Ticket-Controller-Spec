@@ -8,6 +8,7 @@ import { prisma } from "./db.js";
 import {
   sendTicketCommentEmail,
   sendTicketStatusEmail,
+  sendCsatFeedbackEmail,
 } from "./mail.js";
 import { createNotification } from "./notifications.js";
 import { getOrCreateSettingsRecord } from "./settings.js";
@@ -169,6 +170,22 @@ export async function notifyClientOnStatusChange(opts: {
         }),
     },
   });
+
+  if (opts.toStatus === "concluido") {
+    const users = await prisma.user.findMany({
+      where: { clientId: opts.clientId, role: "cliente" },
+      select: { email: true },
+    });
+    for (const u of users) {
+      if (u.email) {
+        await sendCsatFeedbackEmail({
+          to: u.email,
+          ticketKey: opts.ticketKey,
+          organizationId: opts.organizationId,
+        });
+      }
+    }
+  }
 }
 
 export async function notifyClientOnTicketCreated(opts: {

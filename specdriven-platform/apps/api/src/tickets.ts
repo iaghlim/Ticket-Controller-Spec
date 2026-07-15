@@ -15,6 +15,7 @@ import {
 } from "./settings.js";
 import { computeSlaDueAt } from "./sla.js";
 import { recordStatusChange } from "./ticket-history.js";
+import { autoAssign } from "./assignment.js";
 import {
   notifyClientOnStatusChange,
   notifyClientOnTicketCreated,
@@ -24,6 +25,8 @@ const CreateTicketSchema = z.object({
   key: TicketKeySchema.optional(),
   title: z.string().min(1),
   clientId: z.string().uuid(),
+  projectId: z.string().uuid(),
+  assigneeId: z.string().uuid().optional().nullable(),
   description: z.string().optional().nullable(),
   status: TicketStatusSchema.optional(),
   priority: z.string().optional().nullable(),
@@ -193,6 +196,20 @@ export async function createTicketHandler(
       return reply.status(404).send({ error: "client_not_found" });
     }
 
+    const project = await prisma.project.findFirst({
+      where: {
+        id: parsed.data.projectId,
+        clientId: parsed.data.clientId,
+        organizationId: user.organizationId,
+      },
+    });
+    if (!project) {
+      return reply.status(400).send({
+        error: "project_not_found_or_mismatch",
+        message: "O projeto especificado não existe ou não pertence a este cliente.",
+      });
+    }
+
     const ticketType = parsed.data.ticketType ?? "melhoria";
     const enabledTypes = await getEnabledTicketTypesForOrg(user.organizationId);
     if (!enabledTypes.includes(ticketType)) {
@@ -215,14 +232,22 @@ export async function createTicketHandler(
       }
     }
 
-    // Cliente nunca escolhe a key; staff pode omitir para auto-gerar.
+    const count = await prisma.ticket.count({
+      where: { projectId: project.id },
+    });
+    const prefix = ticketKeyPrefixFromCode(project.code);
     const autoKey =
       user.role === "cliente" || !parsed.data.key
-        ? await nextTicketKey(
-            user.organizationId,
-            ticketKeyPrefixFromCode(client.code),
-          )
+        ? `${prefix}-${count + 1}`
         : parsed.data.key;
+
+    let assigneeId = parsed.data.assigneeId;
+    if (assigneeId === undefined) {
+      assigneeId = (await autoAssign({
+        projectId: project.id,
+        module: parsed.data.module ?? null,
+      })) ?? (user.role === "cliente" ? null : user.id);
+    }
 
     const priority = parsed.data.priority ?? null;
     const status = parsed.data.status ?? "backlog";
@@ -238,6 +263,7 @@ export async function createTicketHandler(
       data: {
         organizationId: user.organizationId,
         clientId: parsed.data.clientId,
+        projectId: project.id,
         key: autoKey,
         title: parsed.data.title,
         description: parsed.data.description ?? null,
@@ -248,7 +274,7 @@ export async function createTicketHandler(
         companyName: parsed.data.companyName ?? null,
         module: parsed.data.module ?? null,
         countsTowardBaseline: parsed.data.countsTowardBaseline ?? true,
-        assigneeId: user.role === "cliente" ? null : user.id,
+        assigneeId,
         slaDueAt,
       },
     });
@@ -303,6 +329,13 @@ export async function getTicketByKeyHandler(
         ...(user.role === "cliente" && user.clientId
           ? { clientId: user.clientId }
           : {}),
+      },
+      include: {
+        approvalRequests: {
+          include: {
+            requester: { select: { id: true, name: true, email: true } },
+          },
+        },
       },
     });
     if (!ticket) {
@@ -472,3 +505,4 @@ export async function patchTicketHandler(
     throw err;
   }
 }
+

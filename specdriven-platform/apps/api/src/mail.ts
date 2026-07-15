@@ -405,3 +405,30 @@ export async function sendPasswordResetEmail(opts: {
     organizationId: opts.organizationId,
   });
 }
+
+export async function sendCsatFeedbackEmail(opts: {
+  to: string;
+  ticketKey: string;
+  organizationId: string;
+}): Promise<MailResult> {
+  const base =
+    process.env.APP_PUBLIC_URL?.replace(/\/$/, "") ?? "http://localhost:5173";
+  const feedbackUrl = `${base}/tickets/${encodeURIComponent(opts.ticketKey)}/feedback`;
+  const text = [
+    `Seu chamado ${opts.ticketKey} foi concluído!`,
+    `Por favor, avalie nosso atendimento: ${feedbackUrl}`,
+  ].join("\n");
+
+  return sendMail({
+    to: opts.to,
+    subject: `Avalie o atendimento do chamado ${opts.ticketKey}`,
+    text,
+    html: [
+      `<p>Seu chamado <strong>${escapeHtml(opts.ticketKey)}</strong> foi concluído!</p>`,
+      `<p>Por favor, clique no link abaixo para avaliar nosso atendimento:</p>`,
+      `<p><a href="${escapeHtml(feedbackUrl)}">Avaliar atendimento</a></p>`,
+    ].join(""),
+    organizationId: opts.organizationId,
+  });
+}
+

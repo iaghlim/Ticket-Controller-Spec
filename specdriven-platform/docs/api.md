@@ -157,6 +157,37 @@ Body create: `{ clientId, responseMinutes, resolutionMinutes, name?, priorityMat
 Estado calculado: `{ sla: { state: ok|breached|paused|done, dueAt, policy, elapsedBusinessMinutes, remainingBusinessMinutes, … } }`.  
 `slaDueAt` preenchido na criação do ticket quando há política.
 
+### Projetos e Organizações
+
+#### `GET /organizations`
+
+Retorna a lista de todas as consultorias (organizações) cadastradas. Acesso restrito a usuários com a role `master` em contexto de plataforma.
+
+#### `POST /organizations`
+
+Cria uma nova consultoria na plataforma. Acesso restrito a usuários com a role `master` em contexto de plataforma.  
+Body: `{ "name": string }`  
+Resposta: `201` com `{ organization }`. Cria automaticamente as configurações da organização e o módulo padrão "Geral".
+
+#### `POST /organizations/:organizationId/users`
+
+Cria um novo usuário associado a uma consultoria específica. Acesso restrito a usuários com a role `master`.  
+Body: `{ "email": string, "name": string, "password": string, "role": "admin"|"gestor"|"consultor"|"cliente", "clientId": string? }`  
+Regras:
+- Usuários com role `cliente` exigem obrigatoriamente um `clientId` correspondente a um cliente real da mesma organização.
+- Usuários de staff (`admin`, `gestor`, `consultor`) não devem possuir `clientId`.
+- A role `master` não pode ser atribuída por meio deste endpoint.
+
+#### `GET /projects`
+
+Retorna a lista de projetos da organização do usuário logado. Acesso restrito a usuários staff.  
+Query opcional: `?clientId=<uuid>` (filtra por cliente específico).
+
+#### `POST /projects`
+
+Cria um novo projeto vinculado a um cliente na organização atual. Acesso restrito a administradores/master.  
+Body: `{ "clientId": uuid, "name": string, "code": string? }`
+
 ### `GET /_meta/routes`
 
 Inventário de rotas + flags (`DEV_AUTH_BYPASS`, `storageConfigured`, `mailProvider`).
@@ -256,7 +287,7 @@ Se SMTP falhar (host down / misconfig), a API faz fallback para o stub `log` e o
 - Filtro fila consultor (atribuídos + não atribuídos) se UI exigir query extra
 - E-mail em criação de chamado / novo comentário (roadmap; SMTP workstream)
 
-## Catch-all (OpenAPI / sync / billing / notif / LGPD)
+## Catch-all (OpenAPI / sync / billing / projects / orgs / LGPD)
 
 | Método | Rota | Notas |
 |--------|------|-------|
@@ -270,6 +301,9 @@ Se SMTP falhar (host down / misconfig), a API faz fallback para o stub `log` e o
 | PATCH | `/clients/:id/billing` | baselineHoursMonth + hourlyRateCents (gestor) |
 | PATCH | `/users/:id/billing` | hourRateFactor (gestor) |
 | GET | `/billing/summary?clientId=&from=&to=` | Consumo baseline + custo interno |
+| GET\|POST | `/organizations` | Listar/criar consultorias (master only) |
+| POST | `/organizations/:organizationId/users` | Criar usuário em consultoria (master only) |
+| GET\|POST | `/projects` | Listar/criar projetos da organização (staff) |
 | DELETE | `/tickets/:key` | Soft-delete; `POST …/restore` (gestor) |
 | GET | `/privacy/export` | Export LGPD do usuário |
 | POST | `/privacy/delete` | Anonimização LGPD |

@@ -267,7 +267,7 @@ export type UserRole = (typeof USER_ROLES)[number];
 export const UserRoleSchema = z.enum(USER_ROLES);
 
 /** Workflows de aprovação (workstream dedicado). */
-export const APPROVAL_KINDS = ["ticket", "hour_limit", "time_entry"] as const;
+export const APPROVAL_KINDS = ["ticket", "hour_limit", "time_entry", "change"] as const;
 export type ApprovalKind = (typeof APPROVAL_KINDS)[number];
 export const ApprovalKindSchema = z.enum(APPROVAL_KINDS);
 
@@ -302,7 +302,15 @@ export const ProjectSchema = z.object({
   organizationId: z.string().uuid(),
   clientId: z.string().uuid(),
   name: z.string().min(1),
-  code: z.string().min(1).optional().nullable(),
+  code: z.string().min(1),
+  billingModel: z.enum(["per_hour", "per_ticket", "fixed_project"]).default("per_hour"),
+  baselineHoursMonth: z.number().nullable().optional(),
+  hourlyRateCents: z.number().int().nullable().optional(),
+  ticketRateCents: z.number().int().nullable().optional(),
+  budgetCents: z.number().int().nullable().optional(),
+  startDate: z.coerce.date().nullable().optional(),
+  endDate: z.coerce.date().nullable().optional(),
+  slaActiveStatuses: z.string().default("em_andamento"),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
 });
@@ -357,6 +365,8 @@ export const TicketSchema = z.object({
   slaDueAt: z.coerce.date().optional().nullable(),
   firstResponseAt: z.coerce.date().optional().nullable(),
   resolvedAt: z.coerce.date().optional().nullable(),
+  csatScore: z.number().int().min(1).max(5).optional().nullable(),
+  csatComment: z.string().optional().nullable(),
   deletedAt: z.coerce.date().optional().nullable(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
@@ -538,6 +548,11 @@ export const PortalSettingsSchema = z.object({
   businessHoursSummary: z.string().nullable(),
   knowledgeBaseEnabled: z.boolean(),
   knowledgeBaseUrl: z.string().url().nullable(),
+  serviceOfferings: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    active: z.boolean(),
+  })).optional(),
 });
 export type PortalSettings = z.infer<typeof PortalSettingsSchema>;
 
