@@ -11,11 +11,14 @@ import {
   listProjectAssignments,
   createProjectAssignment,
   deleteProjectAssignment,
+  listUserProjects,
+  linkUserToProject,
+  unlinkUserFromProject,
   type ProjectModuleAssignment,
   type SupportTier,
   type TicketModuleCatalogItem,
 } from "../../lib/api";
-import { formatDate } from "../../lib/labels";
+import { roleLabel } from "../../lib/labels";
 
 export function ProjectsSettingsPage() {
   const [clients, setClients] = useState<Client[]>([]);
@@ -618,10 +621,14 @@ export function ProjectsSettingsPage() {
               <p>Vincule clientes e consultores a este projeto. Usuários sem vínculo veem todos os projetos do cliente; com vínculo, veem apenas os projetos vinculados.</p>
             </div>
           </div>
-          <UserProjectManager projectId={selectedProject.id} />
+          <UserProjectManager projectId={selectedProject.id} clients={clients} />
         </div>
       ) : null}
-function UserProjectManager({ projectId }: { projectId: string }) {
+    </div>
+  );
+}
+
+function UserProjectManager({ projectId, clients }: { projectId: string; clients: Client[] }) {
   const [links, setLinks] = useState<Array<{ id: string; user: { id: string; name: string; email: string; role: string; clientId: string | null }; active: boolean }>>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -631,7 +638,7 @@ function UserProjectManager({ projectId }: { projectId: string }) {
     try {
       const res = await listUserProjects();
       // Filter for this project
-      setLinks(res.links.filter((l) => l.projectId === projectId && l.active && l.user) as any);
+      setLinks(res.links.filter((l: any) => l.projectId === projectId && l.active && l.user) as any);
     } catch { /* ignore */ }
   }, [projectId]);
 
@@ -697,10 +704,10 @@ function UserProjectManager({ projectId }: { projectId: string }) {
                 <tr key={l.id}>
                   <td style={{ fontWeight: "500" }}>{l.user.name}</td>
                   <td className="mono table-meta">{l.user.email}</td>
-                  <td className="table-meta">{roleLabel(l.user.role)}</td>
+                  <td className="table-meta">{roleLabel(l.user.role as any)}</td>
                   <td className="table-meta">
                     {l.user.clientId
-                      ? clients.find((c) => c.id === l.user.clientId)?.name ?? l.user.clientId
+                      ? clients.find((c: Client) => c.id === l.user.clientId)?.name ?? l.user.clientId
                       : "—"}
                   </td>
                   <td>
@@ -742,7 +749,5 @@ function UserProjectManager({ projectId }: { projectId: string }) {
         </p>
       )}
     </div>
-  );
-}</div>
   );
 }

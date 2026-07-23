@@ -405,12 +405,12 @@ export type UserProjectLink = {
   userId: string;
   projectId: string;
   active: boolean;
-  project?: { id: string; name: string; code: string; clientId: string };
+  project?: Project;
 };
 
 export function listUserProjects(userId?: string) {
-  const qs = userId ? ?userId= : '';
-  return request<{ links: UserProjectLink[] }>(/user-projects);
+  const qs = userId ? `?userId=${encodeURIComponent(userId)}` : "";
+  return request<{ links: UserProjectLink[] }>(`/user-projects${qs}`);
 }
 
 export function listProjects(clientId?: string) {

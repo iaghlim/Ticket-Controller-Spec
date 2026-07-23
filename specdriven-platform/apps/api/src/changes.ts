@@ -176,7 +176,6 @@ export async function getChangeHandler(
           },
           orderBy: { createdAt: "desc" },
         },
-        tickets: { select: { id: true, key: true, title: true, status: true } },
       },
     });
 

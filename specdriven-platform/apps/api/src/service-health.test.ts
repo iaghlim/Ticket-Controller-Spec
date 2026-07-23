@@ -11,6 +11,7 @@ describe("Service Health & CSAT Endpoints", () => {
   let clientToken: string;
   let testTicketKey: string;
   let testTicketId: string;
+  let projectId: string;
 
   beforeAll(async () => {
     app = await buildServer();
@@ -38,10 +39,20 @@ describe("Service Health & CSAT Endpoints", () => {
       data: {
         organizationId: orgId,
         name: "Test Client",
-        baselineHoursMonth: 20.0,
       },
     });
     clientId = client.id;
+
+    const project = await prisma.project.create({
+      data: {
+        organizationId: orgId,
+        clientId,
+        name: "TOSH Project",
+        code: "TOSH",
+        baselineHoursMonth: 20.0,
+      },
+    });
+    projectId = project.id;
 
     // Create staff user
     const staff = await prisma.user.create({
@@ -92,6 +103,7 @@ describe("Service Health & CSAT Endpoints", () => {
       data: {
         organizationId: orgId,
         clientId,
+        projectId: project.id,
         key: "TOSH-1",
         title: "Test ticket",
         status: "concluido",
@@ -191,6 +203,7 @@ describe("Service Health & CSAT Endpoints", () => {
       data: {
         organizationId: orgId,
         clientId,
+        projectId,
         key: "TOSH-2",
         title: "Open ticket",
         status: "em_andamento",

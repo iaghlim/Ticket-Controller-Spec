@@ -109,11 +109,30 @@ describe("Problems, Changes & Approvals ITIL Flow", () => {
       clientId: otherClientId,
     });
 
+    const project = await prisma.project.create({
+      data: {
+        organizationId: orgId,
+        clientId,
+        name: "Test Project A",
+        code: "TESTA",
+      },
+    });
+
+    const otherProject = await prisma.project.create({
+      data: {
+        organizationId: orgId,
+        clientId: otherClientId,
+        name: "Test Project B",
+        code: "TESTB",
+      },
+    });
+
     // 5. Create tickets
     const ticket = await prisma.ticket.create({
       data: {
         organizationId: orgId,
         clientId,
+        projectId: project.id,
         key: "TEST-101",
         title: "Database issue",
         status: "backlog",
@@ -126,6 +145,7 @@ describe("Problems, Changes & Approvals ITIL Flow", () => {
       data: {
         organizationId: orgId,
         clientId: otherClientId,
+        projectId: otherProject.id,
         key: "TEST-102",
         title: "UI bug on Client B dashboard",
         status: "backlog",

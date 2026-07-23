@@ -12,6 +12,7 @@ describe("Risks & Security (CSRF / Cookie / SLA Warning)", () => {
   let staffTokenWithCsrf: string;
   let staffTokenBearer: string;
   let clientToken: string;
+  let projectId: string;
   const csrfToken = "my-test-csrf-token";
 
   beforeAll(async () => {
@@ -56,6 +57,16 @@ describe("Risks & Security (CSRF / Cookie / SLA Warning)", () => {
         passwordHash: "hash",
       },
     });
+
+    const project = await prisma.project.create({
+      data: {
+        organizationId: orgId,
+        clientId,
+        name: "Security Test Project",
+        code: "SECP",
+      },
+    });
+    projectId = project.id;
 
     // Sign tokens
     staffTokenWithCsrf = signToken({
@@ -324,6 +335,7 @@ describe("Risks & Security (CSRF / Cookie / SLA Warning)", () => {
         data: {
           organizationId: orgId,
           clientId,
+          projectId,
           key: "SEC-SLA-1",
           title: "SLA Warning Ticket",
           status: "em_andamento",

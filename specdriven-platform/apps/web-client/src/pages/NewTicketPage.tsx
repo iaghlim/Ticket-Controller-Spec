@@ -7,6 +7,8 @@ import {
   createTicket,
   getPlatformMeta,
   listProjects,
+  listUserProjects,
+  type UserProjectLink,
   uploadAttachment,
 } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -105,8 +107,8 @@ export function NewTicketPage() {
         // Check for explicit user-project links first
         const linksRes = await listUserProjects(uid);
         const linkedProjects = linksRes.links
-          .filter((l) => l.active && l.project)
-          .map((l) => l.project!);
+          .filter((l: UserProjectLink) => l.active && l.project)
+          .map((l: UserProjectLink) => l.project!);
         if (linkedProjects.length > 0) {
           if (!cancelled) {
             setProjects(linkedProjects);
