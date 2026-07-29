@@ -73,3 +73,55 @@ export async function listAuditHandler(
 export function auditActor(user: AuthUser): string {
   return user.id === "dev-user" ? "dev-user" : user.id;
 }
+
+/** Exportação de auditoria assinada com hash SHA-256 para conformidade SOC 2 Type II. */
+export async function exportAuditCsvHandler(
+  request: FastifyRequest,
+  reply: FastifyReply,
+) {
+  const user = await requireAuth(request, reply);
+  if (!user) return;
+  if (!["gestor", "admin", "master"].includes(user.role)) {
+    return reply.status(403).send({ error: "forbidden_role" });
+  }
+
+  try {
+    const events = await prisma.auditEvent.findMany({
+      where: { organizationId: user.organizationId },
+      orderBy: { createdAt: "desc" },
+      take: 5000,
+    });
+
+    const header = "id,createdAt,actorId,action,entityType,entityId,metaJson\n";
+    const rows = events.map((e) => {
+      const meta = e.metaJson ? `"${e.metaJson.replace(/"/g, '""')}"` : "";
+      return `"${e.id}","${e.createdAt.toISOString()}","${e.actorId ?? ""}","${e.action}","${e.entityType}","${e.entityId ?? ""}",${meta}`;
+    });
+    const csvContent = header + rows.join("\n");
+
+    const crypto = await import("node:crypto");
+    const sha256Checksum = crypto.createHash("sha256").update(csvContent).digest("hex");
+
+    await writeAudit({
+      organizationId: user.organizationId,
+      actorId: user.id,
+      action: "audit.export_soc2",
+      entityType: "audit_event",
+      meta: { recordCount: events.length, sha256Checksum },
+    });
+
+    reply.header("Content-Type", "text/csv; charset=utf-8");
+    reply.header(
+      "Content-Disposition",
+      `attachment; filename="audit-log-${Date.now()}.csv"`,
+    );
+    reply.header("X-Audit-Checksum-SHA256", sha256Checksum);
+    return reply.send(csvContent);
+  } catch (err) {
+    if (isDbUnavailableError(err)) {
+      return reply.status(503).send({ error: "database_unavailable" });
+    }
+    throw err;
+  }
+}
+

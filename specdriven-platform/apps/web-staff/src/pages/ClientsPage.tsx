@@ -4,23 +4,34 @@ import {
   ApiError,
   createClient,
   createInvite,
+  linkUserToProject,
   listClients,
   listInvites,
   listProjects,
+  listUserProjects,
   listUsers,
+  unlinkUserFromProject,
   type Invite,
+  type UserProjectLink,
 } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { formatDate, roleLabel } from "../lib/labels";
 import { Link } from "react-router-dom";
 
-export function ClientsPage() {
+interface ClientsPageProps {
+  hideHeader?: boolean;
+}
+
+export function ClientsPage({ hideHeader = false }: ClientsPageProps = {}) {
   const { user } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [invites, setInvites] = useState<Invite[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [projectsMap, setProjectsMap] = useState<Record<string, Project[]>>({});
+  const [userProjects, setUserProjects] = useState<UserProjectLink[]>([]);
   const [expandedClient, setExpandedClient] = useState<string | null>(null);
+  const [expandedProject, setExpandedProject] = useState<string | null>(null);
+  
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
@@ -32,6 +43,9 @@ export function ClientsPage() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [inviting, setInviting] = useState(false);
+  const [linking, setLinking] = useState(false);
+
+  const [selectedUserToAdd, setSelectedUserToAdd] = useState<Record<string, string>>({});
 
   const roleOptions: UserRole[] =
     user?.role === "consultor"
@@ -46,14 +60,16 @@ export function ClientsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [c, i, u] = await Promise.all([
+      const [c, i, u, up] = await Promise.all([
         listClients(),
         listInvites(),
         listUsers(),
+        listUserProjects().catch(() => ({ links: [] })),
       ]);
       setClients(c.clients);
       setInvites(i.invites);
       setUsers(u.users);
+      setUserProjects(up.links || []);
       setInviteClientId((prev) => prev || c.clients[0]?.id || "");
 
       // Load projects for each client
@@ -133,6 +149,42 @@ export function ClientsPage() {
     }
   }
 
+  async function handleLinkUser(projectId: string, userId: string) {
+    if (!projectId || !userId) return;
+    setLinking(true);
+    setError(null);
+    try {
+      const { link } = await linkUserToProject(projectId, userId);
+      setUserProjects((prev) => {
+        const filtered = prev.filter((l) => !(l.projectId === projectId && l.userId === userId));
+        return [link, ...filtered];
+      });
+      setSelectedUserToAdd((prev) => ({ ...prev, [projectId]: "" }));
+      setOk("Usuário associado ao projeto com sucesso.");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Falha ao vincular usuário ao projeto.");
+    } finally {
+      setLinking(false);
+    }
+  }
+
+  async function handleUnlinkUser(projectId: string, userId: string) {
+    if (!projectId || !userId) return;
+    setLinking(true);
+    setError(null);
+    try {
+      await unlinkUserFromProject(projectId, userId);
+      setUserProjects((prev) =>
+        prev.filter((l) => !(l.projectId === projectId && l.userId === userId)),
+      );
+      setOk("Vínculo removido com sucesso.");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Falha ao remover vínculo do projeto.");
+    } finally {
+      setLinking(false);
+    }
+  }
+
   function getClientUsers(clientId: string): User[] {
     return users.filter((u) => u.clientId === clientId);
   }
@@ -145,15 +197,34 @@ export function ClientsPage() {
     return projectsMap[clientId] ?? [];
   }
 
+  function getProjectUsers(projectId: string): UserProjectLink[] {
+    return userProjects.filter((l) => l.projectId === projectId && l.active);
+  }
+
+  function getUserProjectLinks(userId: string): UserProjectLink[] {
+    return userProjects.filter((l) => l.userId === userId && l.active);
+  }
+
   return (
     <>
-      <div className="page-head">
-        <div>
-          <p className="page-eyebrow">Gestão</p>
-          <h1 className="page-title-serif">Clientes, Projetos e Usuários.</h1>
-          <p>Cadastro de clientes, projetos por cliente, usuários da org e convites.</p>
+      {!hideHeader ? (
+        <div className="page-head">
+          <div>
+            <p className="page-eyebrow">Gestão & Escala de Permissões</p>
+            <h1 className="page-title-serif">Clientes, Projetos e Usuários.</h1>
+            <p>
+              Pirâmide de Configuração: Consultoria → Cliente → Projeto → Usuários (Consultores & Cliente).
+            </p>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="panel-head">
+          <h2>Usuários, Convites e Clientes</h2>
+          <p>
+            Crie convites por e-mail, defina o perfil (cliente, consultor, gestor) e vincule aos clientes e projetos.
+          </p>
+        </div>
+      )}
 
       {error ? <p className="error">{error}</p> : null}
       {ok ? <p className="ok-banner">{ok}</p> : null}
@@ -166,7 +237,16 @@ export function ClientsPage() {
 
       {/* Client Cards with Hierarchy */}
       <div className="panel">
-        <h2 style={{ marginTop: 0, fontSize: "1.1rem" }}>Clientes</h2>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+          <h2 style={{ margin: 0, fontSize: "1.1rem" }}>Clientes & Projetos</h2>
+          <Link
+            className="btn btn-sm"
+            to="/settings/projects"
+            style={{ flexShrink: 0 }}
+          >
+            + Criar Projeto
+          </Link>
+        </div>
         {loading ? <p className="muted">Carregando…</p> : null}
         {!loading && clients.length === 0 ? (
           <p className="empty">Nenhum cliente cadastrado.</p>
@@ -186,109 +266,226 @@ export function ClientsPage() {
                 animationDelay: `${i * 40}ms`,
                 flexDirection: "column",
                 alignItems: "stretch",
-                cursor: "pointer",
               }}
             >
               {/* Client Header */}
               <div
-                style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
+                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
                 onClick={() => setExpandedClient(isExpanded ? null : c.id)}
               >
                 <div style={{ flex: 1 }}>
                   <div className="ticket-title" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                     <span style={{ fontSize: "0.8rem" }}>{isExpanded ? "▼" : "▶"}</span>
-                    {c.name}
+                    <strong>{c.name}</strong>
                     {c.code ? (
                       <code className="mono" style={{ fontSize: "0.75rem", opacity: 0.6 }}>{c.code}</code>
                     ) : null}
                   </div>
                   <div className="ticket-meta">
-                    {clientProjects.length} projeto(s) · {clientUsers.length} usuário(s) · {clientInvites.length} convite(s) pendente(s) · criado {formatDate(c.createdAt)}
+                    {clientProjects.length} projeto(s) · {clientUsers.length} usuário(s) do cliente · {clientInvites.length} convite(s) pendente(s) · criado {formatDate(c.createdAt)}
                   </div>
                 </div>
-                <Link
-                  className="btn btn-sm btn-ghost"
-                  to={`/settings/projects`}
-                  onClick={(e) => e.stopPropagation()}
-                  style={{ flexShrink: 0 }}
-                >
-                  + Novo Projeto
-                </Link>
               </div>
 
               {/* Expanded details */}
               {isExpanded ? (
                 <div style={{ marginTop: "1rem", borderTop: "1px solid var(--border)", paddingTop: "1rem" }}>
-                  <div className="ok-banner" style={{ marginBottom: "1rem", padding: "0.6rem 0.75rem", fontSize: "0.82rem", background: "#eaf4ea", border: "1px solid #b6d4b6", borderRadius: "6px", color: "#2d6a2d" }}>
-                    <strong>&#9889; Vínculo automático:</strong> Usuários "Cliente" deste cliente enxergam <strong>todos os projetos</strong> abaixo no portal ao abrir chamado. Basta criar o projeto em <Link to="/settings/projects">Configurações → Projetos</Link>. A associação é automática pelo cliente.
+                  
+                  {/* Info Banner */}
+                  <div className="ok-banner" style={{ marginBottom: "1rem", padding: "0.6rem 0.75rem", fontSize: "0.82rem", background: "#f0f4ff", border: "1px solid #c7d2fe", borderRadius: "6px", color: "#1e40af" }}>
+                    <strong>&#128274; Regra de Vínculo de Projetos:</strong> Usuários do cliente com <strong>projetos associados</strong> enxergarão apenas esses projetos específicos no portal ao abrir chamado (`/tickets/new`). Se o usuário não tiver restrições individuais, ele herdará todos os projetos do cliente.
                   </div>
-                  {/* Projects */}
-                  <h4 style={{ margin: "0 0 0.5rem 0", fontSize: "0.9rem", color: "var(--text-muted)" }}>
-                    Projetos ({clientProjects.length})
-                  </h4>
+
+                  {/* Projetos do Cliente */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                    <h4 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 600, color: "var(--text)" }}>
+                      1. Projetos & Equipes Vinculadas ({clientProjects.length})
+                    </h4>
+                    <Link
+                      className="btn btn-sm btn-ghost"
+                      to="/settings/projects"
+                      style={{ fontSize: "0.8rem" }}
+                    >
+                      + Novo Projeto
+                    </Link>
+                  </div>
                   {clientProjects.length === 0 ? (
-                    <p className="empty" style={{ fontSize: "0.8rem" }}>
-                      Nenhum projeto.{" "}
+                    <p className="empty" style={{ fontSize: "0.8rem", marginBottom: "1rem" }}>
+                      Nenhum projeto cadastrado.{" "}
                       <Link to="/settings/projects" style={{ fontWeight: "600" }}>Criar projeto</Link> para este cliente.
                     </p>
                   ) : (
-                    <div className="data-table-wrap" style={{ marginBottom: "1rem" }}>
-                      <table className="data-table" style={{ fontSize: "0.82rem" }}>
-                        <thead>
-                          <tr>
-                            <th>Projeto</th>
-                            <th>Código</th>
-                            <th>Faturamento</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {clientProjects.map((p) => (
-                            <tr key={p.id}>
-                              <td style={{ fontWeight: "500" }}>{p.name}</td>
-                              <td className="mono table-meta">{p.code}</td>
-                              <td className="table-meta">
-                                {p.billingModel === "per_hour"
-                                  ? "Hora (T&M)"
-                                  : p.billingModel === "per_ticket"
-                                    ? "Por Ticket"
-                                    : "Preço Fixo"}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginBottom: "1.5rem" }}>
+                      {clientProjects.map((p) => {
+                        const projectLinks = getProjectUsers(p.id);
+                        const isProjExpanded = expandedProject === p.id;
+                        const availableCandidates = users.filter(
+                          (u) => !projectLinks.some((l) => l.userId === u.id),
+                        );
+
+                        return (
+                          <div
+                            key={p.id}
+                            style={{
+                              border: "1px solid var(--border)",
+                              borderRadius: "var(--radius-md)",
+                              padding: "0.85rem",
+                              background: "var(--surface)",
+                            }}
+                          >
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <div>
+                                <div style={{ fontWeight: 600, fontSize: "0.9rem" }}>
+                                  {p.name}{" "}
+                                  <code className="mono" style={{ fontSize: "0.75rem", opacity: 0.7 }}>[{p.code}]</code>
+                                </div>
+                                <div className="muted" style={{ fontSize: "0.8rem", marginTop: "2px" }}>
+                                  Faturamento: {p.billingModel === "per_hour" ? "Hora (T&M)" : p.billingModel === "per_ticket" ? "Por Ticket" : "Preço Fixo"} · Equipe: {projectLinks.length} usuário(s) associado(s)
+                                </div>
+                              </div>
+                              <button
+                                className="btn btn-sm btn-ghost"
+                                onClick={() => setExpandedProject(isProjExpanded ? null : p.id)}
+                              >
+                                {isProjExpanded ? "Ocultar Equipe ▲" : "Gerenciar Equipe ▼"}
+                              </button>
+                            </div>
+
+                            {/* Equipe do Projeto */}
+                            {isProjExpanded ? (
+                              <div style={{ marginTop: "0.75rem", borderTop: "1px dashed var(--border)", paddingTop: "0.75rem" }}>
+                                <h5 style={{ margin: "0 0 0.5rem 0", fontSize: "0.82rem", color: "var(--text-muted)" }}>
+                                  Usuários com Acesso ao Projeto [{p.code}]
+                                </h5>
+
+                                {projectLinks.length === 0 ? (
+                                  <p className="muted" style={{ fontSize: "0.8rem", margin: "0 0 0.5rem 0" }}>
+                                    Nenhum usuário restrito individualmente. Usuários do cliente herdam acesso por padrão.
+                                  </p>
+                                ) : (
+                                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem", marginBottom: "0.75rem" }}>
+                                    {projectLinks.map((l) => {
+                                      const u = l.user;
+                                      if (!u) return null;
+                                      const isClientRole = u.role === "cliente";
+
+                                      return (
+                                        <span
+                                          key={l.id}
+                                          className="tag-pill"
+                                          style={{
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            gap: "0.4rem",
+                                            background: isClientRole ? "rgba(59, 130, 246, 0.1)" : "rgba(16, 185, 129, 0.1)",
+                                            color: isClientRole ? "var(--primary)" : "#059669",
+                                            borderColor: isClientRole ? "rgba(59, 130, 246, 0.3)" : "rgba(16, 185, 129, 0.3)",
+                                            padding: "3px 8px",
+                                            fontSize: "0.8rem",
+                                          }}
+                                        >
+                                          <strong>{u.name}</strong> ({roleLabel(u.role as UserRole)})
+                                          <button
+                                            style={{
+                                              background: "none",
+                                              border: "none",
+                                              color: "inherit",
+                                              cursor: "pointer",
+                                              fontWeight: "bold",
+                                              marginLeft: "4px",
+                                              padding: 0,
+                                            }}
+                                            title="Remover do projeto"
+                                            disabled={linking}
+                                            onClick={() => void handleUnlinkUser(p.id, u.id)}
+                                          >
+                                            ✕
+                                          </button>
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+
+                                {/* Selector de associacao */}
+                                <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginTop: "0.5rem" }}>
+                                  <select
+                                    style={{ fontSize: "0.82rem", padding: "0.3rem 0.5rem", flex: 1, maxWidth: "320px" }}
+                                    value={selectedUserToAdd[p.id] || ""}
+                                    onChange={(e) =>
+                                      setSelectedUserToAdd((prev) => ({ ...prev, [p.id]: e.target.value }))
+                                    }
+                                  >
+                                    <option value="">-- Associar Consultor ou Usuário Cliente --</option>
+                                    {availableCandidates.map((u) => (
+                                      <option key={u.id} value={u.id}>
+                                        {u.name} ({roleLabel(u.role)}) {u.clientId ? ` - ${clients.find((cl) => cl.id === u.clientId)?.name ?? ""}` : ""}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <button
+                                    className="btn btn-sm"
+                                    disabled={!selectedUserToAdd[p.id] || linking}
+                                    onClick={() => void handleLinkUser(p.id, selectedUserToAdd[p.id]!)}
+                                  >
+                                    + Associar
+                                  </button>
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
 
-                  {/* Users */}
-                  <h4 style={{ margin: "0 0 0.5rem 0", fontSize: "0.9rem", color: "var(--text-muted)" }}>
-                    Usuários do cliente ({clientUsers.length})
+                  {/* Usuários do Cliente */}
+                  <h4 style={{ margin: "0 0 0.5rem 0", fontSize: "0.95rem", fontWeight: 600, color: "var(--text)" }}>
+                    2. Usuários do Cliente ({clientUsers.length})
                   </h4>
                   {clientUsers.length === 0 ? (
-                    <p className="empty" style={{ fontSize: "0.8rem" }}>
-                      Nenhum usuário. Convide um novo usuário com papel "Cliente".
+                    <p className="empty" style={{ fontSize: "0.8rem", marginBottom: "1rem" }}>
+                      Nenhum usuário cadastrado. Use o formulário abaixo para convidar.
                     </p>
                   ) : (
-                    <div className="data-table-wrap" style={{ marginBottom: "1rem" }}>
+                    <div className="data-table-wrap" style={{ marginBottom: "1.5rem" }}>
                       <table className="data-table" style={{ fontSize: "0.82rem" }}>
                         <thead>
                           <tr>
                             <th>Nome</th>
                             <th>E-mail</th>
-                            <th>Papel</th>
+                            <th>Projetos Vinculados</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {clientUsers.map((u) => (
-                            <tr key={u.id}>
-                              <td style={{ fontWeight: "500" }}>
-                                {u.name}
-                                {u.id === user?.id ? " (você)" : ""}
-                              </td>
-                              <td className="mono table-meta">{u.email}</td>
-                              <td className="table-meta">{roleLabel(u.role)}</td>
-                            </tr>
-                          ))}
+                          {clientUsers.map((u) => {
+                            const uLinks = getUserProjectLinks(u.id);
+
+                            return (
+                              <tr key={u.id}>
+                                <td style={{ fontWeight: "500" }}>
+                                  {u.name}
+                                  {u.id === user?.id ? " (você)" : ""}
+                                </td>
+                                <td className="mono table-meta">{u.email}</td>
+                                <td>
+                                  {uLinks.length === 0 ? (
+                                    <span className="muted" style={{ fontSize: "0.78rem" }}>
+                                      Todos os Projetos do Cliente (Padrão)
+                                    </span>
+                                  ) : (
+                                    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
+                                      {uLinks.map((l) => (
+                                        <span key={l.id} className="badge badge-em_andamento" style={{ fontSize: "0.72rem" }}>
+                                          {l.project?.code ?? l.projectId}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -297,8 +494,8 @@ export function ClientsPage() {
                   {/* Pending Invites */}
                   {clientInvites.length > 0 ? (
                     <>
-                      <h4 style={{ margin: "0 0 0.5rem 0", fontSize: "0.9rem", color: "var(--text-muted)" }}>
-                        Convites pendentes ({clientInvites.length})
+                      <h4 style={{ margin: "0 0 0.5rem 0", fontSize: "0.95rem", fontWeight: 600, color: "var(--text-muted)" }}>
+                        3. Convites Pendentes ({clientInvites.length})
                       </h4>
                       <div className="data-table-wrap">
                         <table className="data-table" style={{ fontSize: "0.82rem" }}>
@@ -423,20 +620,33 @@ export function ClientsPage() {
           <p className="muted">Nenhum usuário.</p>
         ) : null}
         <ul className="ticket-list">
-          {users.map((u) => (
-            <li key={u.id} className="ticket-row">
-              <div>
-                <div className="ticket-title">
-                  {u.name}
-                  {u.id === user?.id ? " (você)" : ""}
+          {users.map((u) => {
+            const uLinks = getUserProjectLinks(u.id);
+
+            return (
+              <li key={u.id} className="ticket-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div className="ticket-title">
+                    {u.name}
+                    {u.id === user?.id ? " (você)" : ""}
+                  </div>
+                  <div className="ticket-meta">
+                    {u.email} · {roleLabel(u.role)}
+                    {u.clientId ? ` · vinculado a ${clients.find((c) => c.id === u.clientId)?.name ?? u.clientId}` : ""}
+                  </div>
                 </div>
-                <div className="ticket-meta">
-                  {u.email} · {roleLabel(u.role)}
-                  {u.clientId ? ` · vinculado a ${clients.find((c) => c.id === u.clientId)?.name ?? u.clientId}` : ""}
-                </div>
-              </div>
-            </li>
-          ))}
+                {uLinks.length > 0 ? (
+                  <div style={{ display: "flex", gap: "0.3rem" }}>
+                    {uLinks.map((l) => (
+                      <span key={l.id} className="badge badge-em_andamento" style={{ fontSize: "0.72rem" }}>
+                        {l.project?.code ?? l.projectId}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
       </div>
 

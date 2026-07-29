@@ -23,6 +23,7 @@ Complementa (não substitui) a documentação do app desktop local em SpecDriven
 | [Portal staff](portal-staff.md) | `apps/web-staff` (notas técnicas) |
 | [Aprovações](aprovacoes.md) | Workflows ticket / limite / horas |
 | [Sync desktop](sync-desktop.md) | SpecDriven Local\|Cloud + `/sync/*` |
+| **[Desenvolvimento Seguro](desenvolvimento-seguro.md)** | Prevenção de quebras, contratos, migrations e quality gates |
 
 ## Referência rápida
 

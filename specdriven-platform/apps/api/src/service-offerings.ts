@@ -6,7 +6,8 @@ import { isStaff } from "./permissions.js";
 
 const CreateOfferingSchema = z.object({
   name: z.string().min(1),
-  description: z.string().min(1),
+  description: z.string().min(1).optional().default(""),
+  clientId: z.string().uuid().optional().nullable(),
   slaPolicyId: z.string().uuid().optional().nullable(),
   requiresApproval: z.boolean().optional().default(false),
   status: z.enum(["active", "draft", "retired"]).optional().default("draft"),
@@ -14,7 +15,8 @@ const CreateOfferingSchema = z.object({
 
 const UpdateOfferingSchema = z.object({
   name: z.string().min(1).optional(),
-  description: z.string().min(1).optional(),
+  description: z.string().optional(),
+  clientId: z.string().uuid().optional().nullable(),
   slaPolicyId: z.string().uuid().optional().nullable(),
   requiresApproval: z.boolean().optional(),
   status: z.enum(["active", "draft", "retired"]).optional(),
@@ -48,9 +50,26 @@ export async function listOfferingsHandler(
   if (!isStaff(user)) return staffOnly(reply);
   if (user.organizationId === "dev-org") return devOrgBlock(reply);
 
+  const query = request.query as { clientId?: string };
+
   try {
+    const whereClause: any = {
+      organizationId: user.organizationId,
+    };
+
+    if (query.clientId) {
+      whereClause.OR = [
+        { clientId: null },
+        { clientId: query.clientId },
+      ];
+    }
+
     const offerings = await prisma.serviceOffering.findMany({
-      where: { organizationId: user.organizationId },
+      where: whereClause,
+      include: {
+        client: { select: { id: true, name: true } },
+        slaPolicy: { select: { id: true, name: true } },
+      },
       orderBy: { createdAt: "desc" },
     });
     return { offerings };
@@ -79,6 +98,18 @@ export async function createOfferingHandler(
   }
 
   try {
+    if (parsed.data.clientId) {
+      const client = await prisma.client.findFirst({
+        where: {
+          id: parsed.data.clientId,
+          organizationId: user.organizationId,
+        },
+      });
+      if (!client) {
+        return reply.status(400).send({ error: "invalid_client_id" });
+      }
+    }
+
     if (parsed.data.slaPolicyId) {
       const policy = await prisma.slaPolicy.findFirst({
         where: {
@@ -94,11 +125,16 @@ export async function createOfferingHandler(
     const offering = await prisma.serviceOffering.create({
       data: {
         organizationId: user.organizationId,
+        clientId: parsed.data.clientId ?? null,
         name: parsed.data.name.trim(),
         description: parsed.data.description.trim(),
         slaPolicyId: parsed.data.slaPolicyId ?? null,
         requiresApproval: parsed.data.requiresApproval,
         status: parsed.data.status,
+      },
+      include: {
+        client: { select: { id: true, name: true } },
+        slaPolicy: { select: { id: true, name: true } },
       },
     });
     return reply.status(201).send({ offering });
@@ -143,6 +179,18 @@ export async function patchOfferingHandler(
       return reply.status(404).send({ error: "not_found" });
     }
 
+    if (parsed.data.clientId) {
+      const client = await prisma.client.findFirst({
+        where: {
+          id: parsed.data.clientId,
+          organizationId: user.organizationId,
+        },
+      });
+      if (!client) {
+        return reply.status(400).send({ error: "invalid_client_id" });
+      }
+    }
+
     if (parsed.data.slaPolicyId) {
       const policy = await prisma.slaPolicy.findFirst({
         where: {
@@ -160,9 +208,14 @@ export async function patchOfferingHandler(
       data: {
         ...(parsed.data.name !== undefined ? { name: parsed.data.name.trim() } : {}),
         ...(parsed.data.description !== undefined ? { description: parsed.data.description.trim() } : {}),
+        ...(parsed.data.clientId !== undefined ? { clientId: parsed.data.clientId } : {}),
         ...(parsed.data.slaPolicyId !== undefined ? { slaPolicyId: parsed.data.slaPolicyId } : {}),
         ...(parsed.data.requiresApproval !== undefined ? { requiresApproval: parsed.data.requiresApproval } : {}),
         ...(parsed.data.status !== undefined ? { status: parsed.data.status } : {}),
+      },
+      include: {
+        client: { select: { id: true, name: true } },
+        slaPolicy: { select: { id: true, name: true } },
       },
     });
 

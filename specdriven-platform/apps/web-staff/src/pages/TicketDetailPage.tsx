@@ -576,6 +576,14 @@ export function TicketDetailPage() {
                   : "—"}
               </dd>
             </div>
+            {ticket.serviceOffering ? (
+              <div className="detail-row">
+                <dt>Oferta de Serviço</dt>
+                <dd>
+                  <strong>{ticket.serviceOffering.name}</strong>
+                </dd>
+              </div>
+            ) : null}
             <div className="detail-row">
               <dt>Assignee</dt>
               <dd>{assigneeName}</dd>

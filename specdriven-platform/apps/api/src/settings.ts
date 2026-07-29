@@ -721,6 +721,10 @@ export async function portalSettingsHandler(
       where: {
         organizationId: org.id,
         status: "active",
+        OR: [
+          { clientId: null },
+          ...(user.clientId ? [{ clientId: user.clientId }] : []),
+        ],
       },
       orderBy: { name: "asc" },
     });

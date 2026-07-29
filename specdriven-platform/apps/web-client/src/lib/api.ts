@@ -32,6 +32,14 @@ export type LoginResponse = {
   csrfToken?: string;
 };
 
+export function isStaffRole(role: UserRole | string | undefined | null): boolean {
+  return role === "master" || role === "admin" || role === "gestor" || role === "consultor";
+}
+
+export function attachmentHasBinary(a: Attachment): boolean {
+  return Boolean(a.storageKey && a.sizeBytes && a.sizeBytes > 0);
+}
+
 export class ApiError extends Error {
   status: number;
   body: unknown;
@@ -206,6 +214,7 @@ export function createTicket(input: {
   ticketType?: TicketType;
   companyName?: string;
   module?: string;
+  serviceOfferingId?: string;
 }) {
   return request<{ ticket: Ticket }>("/tickets", {
     method: "POST",
@@ -249,7 +258,12 @@ export function createAttachmentMeta(
   );
 }
 
-/** Multipart upload (field `file`) → MinIO/S3 when storage is configured. */
+export function getAttachmentDownload(key: string, id: string) {
+  return request<{ downloadUrl: string; url?: string; fileName: string }>(
+    `/tickets/${encodeURIComponent(key)}/attachments/${encodeURIComponent(id)}/download`,
+  );
+}
+
 export async function uploadAttachment(
   key: string,
   file: File,
@@ -289,38 +303,19 @@ export async function uploadAttachment(
   return body as { attachment: Attachment; mode: string };
 }
 
-export function getAttachmentDownload(key: string, id: string) {
-  return request<{ url: string; attachmentId: string; expiresInSeconds: number }>(
-    `/tickets/${encodeURIComponent(key)}/attachments/${encodeURIComponent(id)}/download`,
-  );
-}
-
-export function attachmentHasBinary(a: Attachment): boolean {
-  return !a.storageKey.startsWith("local://");
-}
-
-export function isStaffRole(role: UserRole): boolean {
-  return (
-    role === "master" ||
-    role === "admin" ||
-    role === "gestor" ||
-    role === "consultor"
-  );
-}
-
 export type NotificationRow = {
   id: string;
   title: string;
   body: string | null;
   href: string | null;
-  readAt: string | Date | null;
-  createdAt: string | Date;
+  readAt: string | null;
+  createdAt: string;
 };
 
 export type TicketSla = {
   state: SlaState;
   dueAt: string | Date | null;
-  policy: { id: string; name: string } | null;
+  policy: any | null;
   elapsedBusinessMinutes: number | null;
   remainingBusinessMinutes: number | null;
   message?: string;
@@ -398,7 +393,6 @@ export function rejectApproval(id: string, decisionNote?: string | null) {
     body: JSON.stringify({ decisionNote: decisionNote ?? null }),
   });
 }
-
 
 export type UserProjectLink = {
   id: string;

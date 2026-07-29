@@ -30,10 +30,13 @@ export async function listUserProjectsHandler(
 
   const q = request.query as { userId?: string; projectId?: string };
   try {
-    const where: any = {};
-    if (q.userId) where.userId = q.userId;
-    if (q.projectId) where.projectId = q.projectId;
-    where.active = true;
+    const where: any = { active: true };
+    if (user.role === "cliente") {
+      where.userId = user.id;
+    } else {
+      if (q.userId) where.userId = q.userId;
+      if (q.projectId) where.projectId = q.projectId;
+    }
 
     const links = await prisma.userProject.findMany({
       where,
@@ -116,15 +119,19 @@ export async function unlinkUserFromProjectHandler(
     return reply.status(403).send({ error: "forbidden" });
   }
 
-  const { id: projectId } = request.params as { id: string };
-  const parsed = UnlinkUserProjectSchema.safeParse(request.body);
-  if (!parsed.success) {
-    return reply.status(400).send({ error: "invalid_body", details: parsed.error.flatten() });
+  const { id: projectId } = request.params as { id: string; userId?: string };
+  const bodyUserId = (request.body as { userId?: string })?.userId;
+  const queryUserId = (request.query as { userId?: string })?.userId;
+  const paramUserId = (request.params as { userId?: string })?.userId;
+  const userId = bodyUserId || queryUserId || paramUserId;
+
+  if (!userId) {
+    return reply.status(400).send({ error: "invalid_body", message: "userId é obrigatório." });
   }
 
   try {
     const link = await prisma.userProject.findFirst({
-      where: { userId: parsed.data.userId, projectId, active: true },
+      where: { userId, projectId, active: true },
     });
     if (!link) return reply.status(404).send({ error: "link_not_found" });
 

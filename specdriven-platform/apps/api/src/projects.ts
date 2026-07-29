@@ -54,10 +54,6 @@ export async function listProjectsHandler(
   const user = await requireAuth(request, reply);
   if (!user) return;
 
-  if (user.role === "cliente") {
-    return reply.status(403).send({ error: "forbidden" });
-  }
-
   if (user.organizationId === "dev-org") {
     return reply.status(503).send({
       error: "database_required",
@@ -68,6 +64,40 @@ export async function listProjectsHandler(
   const clientId = (request.query as { clientId?: string }).clientId;
 
   try {
+    if (user.role === "cliente") {
+      if (!user.clientId) {
+        return { projects: [] };
+      }
+      // Check for explicit user-project links
+      const userProjects = await prisma.userProject.findMany({
+        where: { userId: user.id, active: true },
+        select: { projectId: true },
+      });
+
+      if (userProjects.length > 0) {
+        const projectIds = userProjects.map((up) => up.projectId);
+        const projects = await prisma.project.findMany({
+          where: {
+            id: { in: projectIds },
+            organizationId: user.organizationId,
+            clientId: user.clientId,
+          },
+          orderBy: { name: "asc" },
+        });
+        return { projects };
+      }
+
+      // Fallback: all active projects of the client
+      const projects = await prisma.project.findMany({
+        where: {
+          organizationId: user.organizationId,
+          clientId: user.clientId,
+        },
+        orderBy: { name: "asc" },
+      });
+      return { projects };
+    }
+
     const projects = await prisma.project.findMany({
       where: {
         organizationId: user.organizationId,
@@ -90,10 +120,6 @@ export async function getProjectHandler(
   const user = await requireAuth(request, reply);
   if (!user) return;
 
-  if (user.role === "cliente") {
-    return reply.status(403).send({ error: "forbidden" });
-  }
-
   const { id } = request.params as { id: string };
 
   try {
@@ -101,6 +127,7 @@ export async function getProjectHandler(
       where: {
         id,
         organizationId: user.organizationId,
+        ...(user.role === "cliente" ? { clientId: user.clientId ?? undefined } : {}),
       },
     });
 

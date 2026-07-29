@@ -644,6 +644,7 @@ export type UserProjectLink = {
   userId: string;
   projectId: string;
   active: boolean;
+  hourRateFactor?: number | null;
   project?: { id: string; name: string; code: string; clientId: string };
   user?: { id: string; name: string; email: string; role: string; clientId: string | null };
 };
@@ -874,6 +875,36 @@ export function patchClientBilling(
     {
       method: "PATCH",
       body: JSON.stringify(input),
+    },
+  );
+}
+
+export function patchProjectBilling(
+  id: string,
+  input: {
+    baselineHoursMonth?: number | null;
+    hourlyRateCents?: number | null;
+  },
+) {
+  return request<{ project: Project }>(
+    `/projects/${encodeURIComponent(id)}/billing`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function patchUserProjectBilling(
+  projectId: string,
+  userId: string,
+  hourRateFactor: number | null,
+) {
+  return request<{ link: UserProjectLink }>(
+    `/projects/${encodeURIComponent(projectId)}/users/${encodeURIComponent(userId)}/billing`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ hourRateFactor }),
     },
   );
 }

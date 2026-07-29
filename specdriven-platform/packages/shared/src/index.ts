@@ -61,6 +61,7 @@ export {
   PatchOrganizationSettingsBodySchema,
   PatchSlaSettingsBodySchema,
   CreateHolidayBodySchema,
+  StrongPasswordSchema,
 } from "./schemas.js";
 
 export {

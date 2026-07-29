@@ -248,6 +248,14 @@ export function TicketDetailPage() {
                 <dd>{moduleLabel(ticket.module, moduleLabels)}</dd>
               </div>
             ) : null}
+            {ticket.serviceOffering ? (
+              <div className="detail-row">
+                <dt>Oferta de Serviço</dt>
+                <dd>
+                  <strong>{ticket.serviceOffering.name}</strong>
+                </dd>
+              </div>
+            ) : null}
             <div className="detail-row">
               <dt>Criado</dt>
               <dd>{formatDate(ticket.createdAt)}</dd>

@@ -33,8 +33,10 @@
     "@prisma/client": "^6.5.0",
     "@specdriven/shared": "*",
     "bcryptjs": "^3.0.3",
+    "bullmq": "^5.41.6",
     "dotenv": "^16.4.7",
     "fastify": "^5.2.1",
+    "ioredis": "^5.6.0",
     "nodemailer": "^9.0.3",
     "zod": "^3.24.2"
   },

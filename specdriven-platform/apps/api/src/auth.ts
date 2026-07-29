@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { UserRole } from "@specdriven/shared";
 import { UserRoleSchema } from "@specdriven/shared";
 import { isDbUnavailableError, prisma } from "./db.js";
+import { writeAudit } from "./audit.js";
 
 const DEV_TOKEN = "dev-token";
 
@@ -245,6 +246,14 @@ export async function loginHandler(
     }
     reply.header("Set-Cookie", cookieParts.join("; "));
 
+    await writeAudit({
+      organizationId: user.organizationId,
+      actorId: user.id,
+      action: "auth.login",
+      entityType: "user",
+      entityId: user.id,
+    });
+
     return {
       token,
       csrfToken,
@@ -261,6 +270,26 @@ export async function loginHandler(
     }
     throw err;
   }
+}
+
+export async function logoutHandler(
+  _request: FastifyRequest,
+  reply: FastifyReply,
+) {
+  const isProd = process.env.NODE_ENV === "production";
+  const cookieParts = [
+    "token=",
+    "HttpOnly",
+    "SameSite=Strict",
+    "Path=/",
+    "Max-Age=0",
+    "Expires=Thu, 01 Jan 1970 00:00:00 GMT",
+  ];
+  if (isProd) {
+    cookieParts.push("Secure");
+  }
+  reply.header("Set-Cookie", cookieParts.join("; "));
+  return { ok: true };
 }
 
 export async function meHandler(request: FastifyRequest, reply: FastifyReply) {

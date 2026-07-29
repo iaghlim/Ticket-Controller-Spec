@@ -22,6 +22,19 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - specdriven_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
   minio:
     image: minio/minio:latest
     profiles: ["storage"]
@@ -115,3 +128,4 @@ services:
 volumes:
   specdriven_pgdata:
   specdriven_minio:
+  specdriven_redisdata:

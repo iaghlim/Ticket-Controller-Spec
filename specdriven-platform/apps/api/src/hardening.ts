@@ -47,23 +47,37 @@ export async function registerHardening(app: FastifyInstance): Promise<void> {
   });
 
   app.addHook("preHandler", async (request, reply) => {
-    if (request.method !== "POST" || request.url.split("?")[0] !== "/auth/login") {
-      return;
-    }
+    if (request.method !== "POST") return;
+
+    const path = request.url.split("?")[0];
+    const isLogin = path === "/auth/login";
+    const isForgot = path === "/auth/forgot-password";
+    const isReset = path === "/auth/reset-password";
+
+    if (!isLogin && !isForgot && !isReset) return;
+
     const ip = request.ip || "unknown";
     const now = Date.now();
     const windowMs = 60_000;
-    const max = Number(process.env.LOGIN_RATE_LIMIT ?? 30);
-    let bucket = loginAttempts.get(ip);
+    const key = `${ip}:${path}`;
+
+    const maxAttempts = isLogin
+      ? Number(process.env.LOGIN_RATE_LIMIT ?? 5)
+      : 3;
+
+    let bucket = loginAttempts.get(key);
     if (!bucket || bucket.resetAt < now) {
       bucket = { count: 0, resetAt: now + windowMs };
-      loginAttempts.set(ip, bucket);
+      loginAttempts.set(key, bucket);
     }
     bucket.count += 1;
-    if (bucket.count > max) {
+    if (bucket.count > maxAttempts) {
+      const retryAfterSeconds = Math.ceil((bucket.resetAt - now) / 1000);
+      reply.header("Retry-After", String(retryAfterSeconds));
       return reply.status(429).send({
         error: "rate_limited",
-        message: "Muitas tentativas de login. Aguarde um minuto.",
+        message: "Muitas tentativas em rotas de autenticação. Aguarde um minuto.",
+        retryAfterSeconds,
       });
     }
   });

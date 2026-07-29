@@ -2,6 +2,7 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
+import { StrongPasswordSchema } from "@specdriven/shared";
 import { prisma, isDbUnavailableError } from "./db.js";
 import { sendPasswordResetEmail } from "./mail.js";
 
@@ -13,7 +14,7 @@ const ForgotBodySchema = z.object({
 
 const ResetBodySchema = z.object({
   token: z.string().min(16),
-  password: z.string().min(8),
+  password: StrongPasswordSchema,
 });
 
 function resetSecret(): string {

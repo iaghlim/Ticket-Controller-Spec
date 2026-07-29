@@ -3,11 +3,18 @@ import { TICKET_TYPES, type TicketType } from "@specdriven/shared";
 import {
   ApiError,
   createModule,
+  createOffering,
   deleteModule,
+  deleteOffering,
   getSettings,
+  listClients,
   listModules,
+  listOfferings,
   patchModule,
+  patchOffering,
   patchPortalSettings,
+  type Client,
+  type ServiceOfferingItem,
   type TicketModuleCatalogItem,
 } from "../../lib/api";
 import { ticketTypeLabel } from "../../lib/labels";
@@ -15,26 +22,14 @@ import { TagsSection } from "../TagsPage";
 
 type Tab = "portal" | "tags" | "offerings";
 
-export interface ServiceOffering {
-  id: string;
-  name: string;
-  active: boolean;
-  updatedAt: string;
-}
-
 const MODULE_KEY_PATTERN = /^[a-z][a-z0-9_]{1,31}$/;
-
-const DEFAULT_OFFERINGS: ServiceOffering[] = [
-  { id: "offering-1", name: "Suporte Nível 1 - 8x5", active: true, updatedAt: new Date().toISOString() },
-  { id: "offering-2", name: "Suporte Premium - 24x7", active: true, updatedAt: new Date().toISOString() },
-  { id: "offering-3", name: "Consultoria Técnica Especializada", active: true, updatedAt: new Date().toISOString() },
-];
 
 export function CatalogSettingsPage() {
   const [tab, setTab] = useState<Tab>("portal");
   const [canEdit, setCanEdit] = useState(false);
   const [enabledTypes, setEnabledTypes] = useState<TicketType[]>([...TICKET_TYPES]);
   const [modules, setModules] = useState<TicketModuleCatalogItem[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [moduleKey, setModuleKey] = useState("");
   const [moduleLabel, setModuleLabel] = useState("");
   const [editingModuleId, setEditingModuleId] = useState<string | null>(null);
@@ -46,37 +41,40 @@ export function CatalogSettingsPage() {
   const [deletingModuleId, setDeletingModuleId] = useState<string | null>(null);
 
   // Service Offerings states
-  const [offerings, setOfferings] = useState<ServiceOffering[]>([]);
-  const [showOfferingForm, setShowOfferingForm] = useState(false);
+  const [offerings, setOfferings] = useState<ServiceOfferingItem[]>([]);
+  const [selectedClientIdFilter, setSelectedClientIdFilter] = useState<string>("");
   const [editingOfferingId, setEditingOfferingId] = useState<string | null>(null);
   const [offeringName, setOfferingName] = useState("");
+  const [offeringDescription, setOfferingDescription] = useState("");
+  const [offeringClientId, setOfferingClientId] = useState<string>("");
   const [offeringActive, setOfferingActive] = useState(true);
+  const [savingOffering, setSavingOffering] = useState(false);
+
+  const fetchOfferings = useCallback(async (clientId?: string) => {
+    try {
+      const res = await listOfferings(clientId || undefined);
+      setOfferings(res.offerings);
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [settingsRes, modulesRes] = await Promise.all([
+      const [settingsRes, modulesRes, clientsRes] = await Promise.all([
         getSettings(),
         listModules(),
+        listClients().catch(() => ({ clients: [] })),
       ]);
       setCanEdit(settingsRes.canEdit);
       setEnabledTypes(settingsRes.settings.enabledTicketTypes ?? [...TICKET_TYPES]);
       setModules(modulesRes.modules);
+      setClients(clientsRes.clients ?? []);
 
-      // Load offerings from localStorage
-      const savedOffs = localStorage.getItem("specdriven.service_offerings");
-      if (savedOffs) {
-        try {
-          setOfferings(JSON.parse(savedOffs));
-        } catch (err) {
-          setOfferings(DEFAULT_OFFERINGS);
-          localStorage.setItem("specdriven.service_offerings", JSON.stringify(DEFAULT_OFFERINGS));
-        }
-      } else {
-        setOfferings(DEFAULT_OFFERINGS);
-        localStorage.setItem("specdriven.service_offerings", JSON.stringify(DEFAULT_OFFERINGS));
-      }
+      const offeringsRes = await listOfferings(selectedClientIdFilter || undefined);
+      setOfferings(offeringsRes.offerings);
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -86,67 +84,84 @@ export function CatalogSettingsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedClientIdFilter]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  function saveOfferingsToLocalStorage(updatedList: ServiceOffering[]) {
-    setOfferings(updatedList);
-    localStorage.setItem("specdriven.service_offerings", JSON.stringify(updatedList));
-  }
+  const handleFilterClientChange = async (cid: string) => {
+    setSelectedClientIdFilter(cid);
+    await fetchOfferings(cid);
+  };
 
-  function handleSaveOffering(e: FormEvent) {
+  async function handleSaveOffering(e: FormEvent) {
     e.preventDefault();
     if (!offeringName.trim()) return;
 
-    let updatedList: ServiceOffering[];
-    if (editingOfferingId) {
-      updatedList = offerings.map((o) =>
-        o.id === editingOfferingId
-          ? { ...o, name: offeringName.trim(), active: offeringActive, updatedAt: new Date().toISOString() }
-          : o
-      );
-      setOk("Oferta de serviço atualizada com sucesso.");
-    } else {
-      const newOff: ServiceOffering = {
-        id: `offering-${Date.now()}`,
-        name: offeringName.trim(),
-        active: offeringActive,
-        updatedAt: new Date().toISOString(),
-      };
-      updatedList = [...offerings, newOff];
-      setOk("Oferta de serviço criada com sucesso.");
+    setSavingOffering(true);
+    setError(null);
+    setOk(null);
+
+    try {
+      if (editingOfferingId) {
+        await patchOffering(editingOfferingId, {
+          name: offeringName.trim(),
+          description: offeringDescription.trim(),
+          clientId: offeringClientId || null,
+          status: offeringActive ? "active" : "draft",
+        });
+        setOk("Oferta de serviço atualizada com sucesso.");
+      } else {
+        await createOffering({
+          name: offeringName.trim(),
+          description: offeringDescription.trim(),
+          clientId: offeringClientId || null,
+          status: offeringActive ? "active" : "draft",
+        });
+        setOk("Oferta de serviço criada com sucesso.");
+      }
+      resetOfferingForm();
+      await fetchOfferings(selectedClientIdFilter);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Falha ao salvar oferta de serviço.");
+    } finally {
+      setSavingOffering(false);
     }
-    saveOfferingsToLocalStorage(updatedList);
-    resetOfferingForm();
   }
 
-  function handleEditOffering(offering: ServiceOffering) {
+  function handleEditOffering(offering: ServiceOfferingItem) {
     setEditingOfferingId(offering.id);
     setOfferingName(offering.name);
-    setOfferingActive(offering.active);
-    setShowOfferingForm(true);
+    setOfferingDescription(offering.description ?? "");
+    setOfferingClientId(offering.clientId ?? "");
+    setOfferingActive(offering.status === "active");
     setError(null);
     setOk(null);
   }
 
-  function handleDeleteOffering(id: string) {
-    if (!window.confirm("Deseja realmente excluir/retirar esta oferta de serviço?")) return;
-    const updatedList = offerings.filter((o) => o.id !== id);
-    saveOfferingsToLocalStorage(updatedList);
-    setOk("Oferta de serviço excluída.");
-    if (editingOfferingId === id) {
-      resetOfferingForm();
+  async function handleDeleteOffering(id: string) {
+    if (!window.confirm("Deseja realmente retirar/desativar esta oferta de serviço?")) return;
+    setError(null);
+    setOk(null);
+    try {
+      await deleteOffering(id);
+      setOk("Oferta de serviço retirada.");
+      if (editingOfferingId === id) {
+        resetOfferingForm();
+      }
+      await fetchOfferings(selectedClientIdFilter);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Falha ao excluir oferta.");
     }
   }
 
   function resetOfferingForm() {
     setEditingOfferingId(null);
     setOfferingName("");
+    setOfferingDescription("");
+    setOfferingClientId("");
     setOfferingActive(true);
-    setShowOfferingForm(false);
   }
 
   function toggleType(type: TicketType) {
@@ -282,7 +297,7 @@ export function CatalogSettingsPage() {
       <div className="panel-head">
         <h2>Catálogo do portal</h2>
         <p>
-          Tipos de chamado e módulos visíveis ao cliente na abertura de chamados.
+          Tipos de chamado, módulos e ofertas de serviço visíveis ao cliente.
           {!canEdit ? (
             <span className="muted">
               {" "}
@@ -318,7 +333,7 @@ export function CatalogSettingsPage() {
           className={`catalog-tab${tab === "offerings" ? " active" : ""}`}
           onClick={() => setTab("offerings")}
         >
-          Service Offerings
+          Service Offerings por Cliente
         </button>
       </div>
 
@@ -501,12 +516,35 @@ export function CatalogSettingsPage() {
 
       {tab === "offerings" && (
         <>
+          <div className="panel" style={{ marginBottom: "1.5rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
+              <div>
+                <h3 style={{ marginTop: 0, marginBottom: "0.25rem" }}>Filtrar Catálogo por Cliente</h3>
+                <p className="muted" style={{ margin: 0 }}>Cada cliente visualiza as ofertas específicas configuradas para sua conta ou ofertas gerais.</p>
+              </div>
+              <div style={{ minWidth: "220px" }}>
+                <select
+                  value={selectedClientIdFilter}
+                  onChange={(e) => void handleFilterClientChange(e.target.value)}
+                  style={{ width: "100%" }}
+                >
+                  <option value="">— Todas as Ofertas —</option>
+                  {clients.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} {c.code ? `(${c.code})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
           {canEdit && (
             <div className="panel" style={{ marginBottom: "1.5rem" }}>
               <h3 style={{ marginTop: 0 }}>
                 {editingOfferingId ? "Editar Oferta de Serviço" : "Nova Oferta de Serviço"}
               </h3>
-              <p className="muted">Defina as ofertas de serviços disponíveis para vinculação em chamados.</p>
+              <p className="muted">Defina ofertas de serviço para o catálogo do cliente ou gerais.</p>
               <form onSubmit={handleSaveOffering} className="form form-spaced">
                 <div className="field">
                   <label htmlFor="off-name">Nome da Oferta *</label>
@@ -516,9 +554,40 @@ export function CatalogSettingsPage() {
                     required
                     value={offeringName}
                     onChange={(e) => setOfferingName(e.target.value)}
-                    placeholder="Ex: Suporte Premium 24x7"
+                    placeholder="Ex: Suporte Nível 1 - 8x5 ou Consultoria Especializada"
                   />
                 </div>
+
+                <div className="field">
+                  <label htmlFor="off-desc">Descrição / Escopo</label>
+                  <textarea
+                    id="off-desc"
+                    value={offeringDescription}
+                    onChange={(e) => setOfferingDescription(e.target.value)}
+                    placeholder="Detalhamento do serviço oferecido (opcional)"
+                    rows={2}
+                  />
+                </div>
+
+                <div className="field">
+                  <label htmlFor="off-client">Cliente Alvo</label>
+                  <select
+                    id="off-client"
+                    value={offeringClientId}
+                    onChange={(e) => setOfferingClientId(e.target.value)}
+                  >
+                    <option value="">Geral — Todos os Clientes</option>
+                    {clients.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} {c.code ? `(${c.code})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="muted field-note">
+                    Ofertas vinculadas a um cliente específico serão exibidas apenas para esse cliente no portal.
+                  </span>
+                </div>
+
                 <div className="field" style={{ flexDirection: "row", alignItems: "center", gap: "0.5rem" }}>
                   <input
                     id="off-active"
@@ -527,14 +596,15 @@ export function CatalogSettingsPage() {
                     onChange={(e) => setOfferingActive(e.target.checked)}
                   />
                   <label htmlFor="off-active" style={{ marginBottom: 0, cursor: "pointer" }}>
-                    Ativo (Disponível para seleção)
+                    Ativo (Disponível no Portal do Cliente)
                   </label>
                 </div>
+
                 <div className="form-actions">
-                  <button className="btn" type="submit">
-                    {editingOfferingId ? "Atualizar" : "Criar"}
+                  <button className="btn" type="submit" disabled={savingOffering}>
+                    {savingOffering ? "Salvando…" : editingOfferingId ? "Atualizar" : "Criar Oferta"}
                   </button>
-                  {(editingOfferingId || showOfferingForm) && (
+                  {editingOfferingId && (
                     <button type="button" className="btn btn-ghost" onClick={resetOfferingForm}>
                       Cancelar
                     </button>
@@ -547,18 +617,19 @@ export function CatalogSettingsPage() {
           <div className="panel" style={{ padding: 0 }}>
             <div className="panel-section-head">
               <div>
-                <h3>Ofertas de Serviço</h3>
-                <p>{offerings.length} oferta(s) cadastrada(s)</p>
+                <h3>Ofertas de Serviço Cadastradas</h3>
+                <p>{offerings.length} oferta(s) encontrada(s)</p>
               </div>
             </div>
             {offerings.length === 0 ? (
-              <p className="empty">Nenhuma oferta de serviço cadastrada.</p>
+              <p className="empty">Nenhuma oferta de serviço cadastrada para este filtro.</p>
             ) : (
               <div className="data-table-wrap">
                 <table className="data-table">
                   <thead>
                     <tr>
                       <th>Nome da Oferta</th>
+                      <th>Cliente Alvo</th>
                       <th>Status</th>
                       <th>Última Atualização</th>
                       {canEdit ? <th style={{ width: "200px" }} /> : null}
@@ -567,10 +638,18 @@ export function CatalogSettingsPage() {
                   <tbody>
                     {offerings.map((off) => (
                       <tr key={off.id}>
-                        <td style={{ fontWeight: 600 }}>{off.name}</td>
                         <td>
-                          <span className={`settings-status-pill${off.active ? " ok" : " warn"}`}>
-                            {off.active ? "Ativo" : "Inativo"}
+                          <div style={{ fontWeight: 600 }}>{off.name}</div>
+                          {off.description ? <div className="table-meta">{off.description}</div> : null}
+                        </td>
+                        <td>
+                          <span className={`settings-status-pill ${off.client ? "ok" : ""}`}>
+                            {off.client ? off.client.name : "Geral (Todos)"}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`settings-status-pill ${off.status === "active" ? "ok" : "warn"}`}>
+                            {off.status === "active" ? "Ativo" : off.status === "draft" ? "Rascunho" : "Retirado"}
                           </span>
                         </td>
                         <td className="table-meta">
@@ -590,9 +669,9 @@ export function CatalogSettingsPage() {
                                 type="button"
                                 className="btn btn-ghost btn-sm"
                                 style={{ color: "red" }}
-                                onClick={() => handleDeleteOffering(off.id)}
+                                onClick={() => void handleDeleteOffering(off.id)}
                               >
-                                Excluir/Retirar
+                                Retirar
                               </button>
                             </div>
                           </td>

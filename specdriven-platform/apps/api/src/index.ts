@@ -12,8 +12,8 @@ import {
   patchTicketHourLimitHandler,
   rejectApprovalHandler,
 } from "./approvals.js";
-import { listAuditHandler } from "./audit.js";
-import { loginHandler, meHandler, switchOrgHandler, exitOrgHandler } from "./auth.js";
+import { listAuditHandler, exportAuditCsvHandler } from "./audit.js";
+import { loginHandler, logoutHandler, meHandler, switchOrgHandler, exitOrgHandler } from "./auth.js";
 import {
   forgotPasswordHandler,
   resetPasswordHandler,
@@ -26,7 +26,9 @@ import {
 import {
   billingSummaryHandler,
   patchClientBillingHandler,
+  patchProjectBillingHandler,
   patchUserBillingHandler,
+  patchUserProjectBillingHandler,
 } from "./billing.js";
 import {
   createClientHandler,
@@ -252,6 +254,7 @@ async function buildServer() {
   app.get("/hello", async () => helloPayload);
 
   app.post("/auth/login", loginHandler);
+  app.post("/auth/logout", logoutHandler);
   app.post("/auth/forgot-password", forgotPasswordHandler);
   app.post("/auth/reset-password", resetPasswordHandler);
   app.get("/auth/me", meHandler);
@@ -321,11 +324,18 @@ async function buildServer() {
 
   app.get("/billing/summary", billingSummaryHandler);
   app.patch("/users/:id/billing", patchUserBillingHandler);
+  app.patch("/projects/:id/billing", patchProjectBillingHandler);
+  app.patch(
+    "/projects/:projectId/users/:userId/billing",
+    patchUserProjectBillingHandler,
+  );
 
   app.get("/privacy/export", privacyExportHandler);
   app.post("/privacy/delete", privacyDeleteHandler);
 
   app.get("/audit", listAuditHandler);
+  app.get("/audit/export", exportAuditCsvHandler);
+  app.get("/settings/audit/export", exportAuditCsvHandler);
 
   app.get("/reports/tickets", ticketsReportHandler);
   app.get("/reports/tickets.csv", ticketsCsvHandler);
@@ -482,8 +492,19 @@ async function buildServer() {
 
 export { buildServer };
 
+import { initMailWorker } from "./workers/mailWorker.js";
+import { initSlaWorker } from "./workers/slaWorker.js";
+
 async function main() {
   const app = await buildServer();
+
+  try {
+    initMailWorker();
+    initSlaWorker();
+    app.log.info("Workers de fila assíncrona (Mail & SLA) inicializados.");
+  } catch (err) {
+    app.log.warn({ err }, "Inicialização de workers Redis indisponível — rodando em modo inline.");
+  }
 
   if (isStorageConfigured()) {
     try {

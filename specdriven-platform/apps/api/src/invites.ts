@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
-import { UserRoleSchema } from "@specdriven/shared";
+import { UserRoleSchema, StrongPasswordSchema } from "@specdriven/shared";
 import { requireAuth } from "./auth.js";
 import { isDbUnavailableError, prisma } from "./db.js";
 import { shouldReturnInviteToken } from "./hardening.js";
@@ -19,7 +19,7 @@ const CreateInviteSchema = z.object({
 const AcceptInviteSchema = z.object({
   token: z.string().min(16),
   name: z.string().min(1),
-  password: z.string().min(8),
+  password: StrongPasswordSchema,
 });
 
 function dbUnavailable(reply: FastifyReply) {

@@ -51,10 +51,10 @@ export function NewTicketPage() {
   const [loadingMeta, setLoadingMeta] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [serviceOffering, setServiceOffering] = useState("");
+  const [serviceOfferingId, setServiceOfferingId] = useState("");
 
   const activeOfferings = useMemo(() => {
-    return (portalSettings?.serviceOfferings ?? []).filter((o) => o.active);
+    return (portalSettings?.serviceOfferings ?? []).filter((o) => o.active !== false && o.status !== "retired");
   }, [portalSettings]);
 
   useEffect(() => {
@@ -156,18 +156,14 @@ export function NewTicketPage() {
 
     setSubmitting(true);
     try {
-      let finalDescription = description.trim();
-      if (serviceOffering) {
-        finalDescription += `\n\n**Oferta de Serviço:** ${serviceOffering}`;
-      }
-
       const { ticket } = await createTicket({
         title: title.trim(),
         clientId: user.clientId,
         projectId,
-        description: finalDescription || undefined,
+        description: description.trim() || undefined,
         ticketType,
         module,
+        serviceOfferingId: serviceOfferingId || undefined,
       });
 
       if (file) {
@@ -293,13 +289,13 @@ export function NewTicketPage() {
               <label htmlFor="serviceOffering">Oferta de Serviço (Opcional)</label>
               <select
                 id="serviceOffering"
-                value={serviceOffering}
-                onChange={(e) => setServiceOffering(e.target.value)}
+                value={serviceOfferingId}
+                onChange={(e) => setServiceOfferingId(e.target.value)}
                 disabled={formLoading}
               >
                 <option value="">Nenhuma oferta selecionada</option>
                 {activeOfferings.map((o) => (
-                  <option key={o.id} value={o.name}>
+                  <option key={o.id} value={o.id}>
                     {o.name}
                   </option>
                 ))}

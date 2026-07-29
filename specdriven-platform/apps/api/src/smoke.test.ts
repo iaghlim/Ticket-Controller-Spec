@@ -44,4 +44,13 @@ describe("smoke API", () => {
     const res = await app.inject({ method: "GET", url: "/auth/me" });
     expect(res.statusCode).toBe(401);
   });
+
+  it("POST /auth/logout clears auth cookie and returns ok", async () => {
+    const res = await app.inject({ method: "POST", url: "/auth/logout" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true });
+    const setCookie = res.headers["set-cookie"] as string;
+    expect(setCookie).toBeDefined();
+    expect(setCookie).toContain("Max-Age=0");
+  });
 });

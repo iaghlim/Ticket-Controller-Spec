@@ -361,6 +361,8 @@ export const TicketSchema = z.object({
   ticketType: TicketTypeSchema.optional(),
   companyName: z.string().min(1).optional().nullable(),
   module: z.string().min(1).optional().nullable(),
+  serviceOfferingId: z.string().uuid().optional().nullable(),
+  serviceOffering: z.object({ id: z.string(), name: z.string(), description: z.string().nullable().optional() }).optional().nullable(),
   countsTowardBaseline: z.boolean().optional(),
   slaDueAt: z.coerce.date().optional().nullable(),
   firstResponseAt: z.coerce.date().optional().nullable(),
@@ -551,7 +553,11 @@ export const PortalSettingsSchema = z.object({
   serviceOfferings: z.array(z.object({
     id: z.string(),
     name: z.string(),
-    active: z.boolean(),
+    description: z.string().nullable().optional(),
+    clientId: z.string().nullable().optional(),
+    slaPolicyId: z.string().nullable().optional(),
+    status: z.string().optional(),
+    active: z.boolean().optional(),
   })).optional(),
 });
 export type PortalSettings = z.infer<typeof PortalSettingsSchema>;
@@ -582,3 +588,13 @@ export const CreateHolidayBodySchema = z.object({
   name: z.string().max(120).optional().nullable(),
 });
 export type CreateHolidayBody = z.infer<typeof CreateHolidayBodySchema>;
+
+/** Validação de complexidade de senha SOC 2 / LGPD. */
+export const StrongPasswordSchema = z
+  .string()
+  .min(12, "A senha deve conter no mínimo 12 caracteres.")
+  .regex(/[A-Z]/, "A senha deve conter ao menos uma letra maiúscula.")
+  .regex(/[a-z]/, "A senha deve conter ao menos uma letra minúscula.")
+  .regex(/[0-9]/, "A senha deve conter ao menos um número.")
+  .regex(/[^A-Za-z0-9]/, "A senha deve conter ao menos um caractere especial.");
+

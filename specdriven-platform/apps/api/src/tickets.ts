@@ -34,6 +34,7 @@ const CreateTicketSchema = z.object({
   ticketType: TicketTypeSchema.optional(),
   companyName: z.string().min(1).optional().nullable(),
   module: z.string().min(1).optional().nullable(),
+  serviceOfferingId: z.string().uuid().optional().nullable(),
   countsTowardBaseline: z.boolean().optional(),
 });
 
@@ -273,6 +274,7 @@ export async function createTicketHandler(
         ticketType,
         companyName: parsed.data.companyName ?? null,
         module: parsed.data.module ?? null,
+        serviceOfferingId: parsed.data.serviceOfferingId ?? null,
         countsTowardBaseline: parsed.data.countsTowardBaseline ?? true,
         assigneeId,
         slaDueAt,
@@ -331,6 +333,7 @@ export async function getTicketByKeyHandler(
           : {}),
       },
       include: {
+        serviceOffering: { select: { id: true, name: true, description: true } },
         approvalRequests: {
           include: {
             requester: { select: { id: true, name: true, email: true } },
