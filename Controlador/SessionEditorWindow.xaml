@@ -1,0 +1,67 @@
+<Window x:Class="Controlador.SessionEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Corrigir sessão"
+        Width="470"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="{DynamicResource AppBackground}">
+    <Border Padding="24" Background="{DynamicResource CardBackground}">
+        <StackPanel>
+            <TextBlock Text="Corrigir período trabalhado" FontSize="20" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" />
+            <TextBlock Text="Ajuste o chamado e os horários se o contador ficou aberto ou se houve uma troca tardia."
+                       Margin="0,6,0,20"
+                       Foreground="{DynamicResource MutedTextBrush}"
+                       TextWrapping="Wrap" />
+
+            <TextBlock Text="Chamado" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" />
+            <TextBox x:Name="TicketCodeTextBox" Margin="0,6,0,16" />
+
+            <Grid Margin="0,0,0,16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="Início" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" />
+                <TextBlock Grid.Row="0" Grid.Column="2" Text="Horário" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" />
+                <DatePicker x:Name="StartDatePicker" Grid.Row="1" Grid.Column="0" Margin="0,6,0,0" />
+                <TextBox x:Name="StartTimeTextBox" Grid.Row="1" Grid.Column="2" Margin="0,6,0,0" />
+            </Grid>
+
+            <Grid Margin="0,0,0,16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="Fim" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" />
+                <TextBlock Grid.Row="0" Grid.Column="2" Text="Horário" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" />
+                <DatePicker x:Name="EndDatePicker" Grid.Row="1" Grid.Column="0" Margin="0,6,0,0" />
+                <TextBox x:Name="EndTimeTextBox" Grid.Row="1" Grid.Column="2" Margin="0,6,0,0" />
+            </Grid>
+
+            <TextBlock x:Name="ValidationText"
+                       Foreground="{DynamicResource PrimaryBrush}"
+                       TextWrapping="Wrap"
+                       Visibility="Collapsed"
+                       Margin="0,0,0,12" />
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="Cancelar" Style="{StaticResource SecondaryButton}" Click="CancelButton_Click" Margin="0,0,8,0" />
+                <Button Content="Salvar correção" Click="SaveButton_Click" />
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>

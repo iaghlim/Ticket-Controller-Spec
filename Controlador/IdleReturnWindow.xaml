@@ -1,0 +1,70 @@
+<Window x:Class="Controlador.IdleReturnWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Retorno de Inatividade"
+        Width="440"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="{DynamicResource AppBackground}">
+    <Border Padding="24" Background="{DynamicResource CardBackground}">
+        <StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                <TextBlock Text="☕" FontSize="28" Margin="0,0,10,0" VerticalAlignment="Center" />
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock x:Name="HeadlineText"
+                               Text="Você ficou ausente por um tempo"
+                               FontSize="17"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextBrush}" />
+                    <TextBlock x:Name="SubtitleText"
+                               Foreground="{DynamicResource MutedTextBrush}"
+                               Margin="0,3,0,0" />
+                </StackPanel>
+            </StackPanel>
+
+            <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Margin="0,6,0,16" />
+
+            <TextBlock Text="O que deseja fazer com esse período?"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextBrush}"
+                       Margin="0,0,0,14" />
+
+            <!-- Option: Keep -->
+            <RadioButton x:Name="KeepRadio"
+                         Content="Manter gravado  — o tempo ocioso fica registrado no chamado atual"
+                         IsChecked="True"
+                         Margin="0,0,0,8"
+                         Foreground="{DynamicResource TextBrush}" />
+
+            <!-- Option: Discard -->
+            <RadioButton x:Name="DiscardRadio"
+                         Content="Descontar  — encerrar o chamado no início da ausência, retomar agora"
+                         Margin="0,0,0,8"
+                         Foreground="{DynamicResource TextBrush}" />
+
+            <!-- Option: Move -->
+            <RadioButton x:Name="MoveRadio"
+                         Content="Mover para outro chamado  — o período ocioso vai para:"
+                         Margin="0,0,0,6"
+                         Foreground="{DynamicResource TextBrush}" />
+
+            <TextBox x:Name="MoveToTicketTextBox"
+                     Margin="22,0,0,16"
+                     IsEnabled="False"
+                     ToolTip="Número do chamado para onde mover o período ocioso"
+                     Background="{DynamicResource InputBackground}"
+                     Foreground="{DynamicResource TextBrush}"
+                     BorderBrush="{DynamicResource BorderBrush}" />
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="Cancelar"
+                        Style="{StaticResource SecondaryButton}"
+                        Click="CancelButton_Click"
+                        Margin="0,0,8,0" />
+                <Button Content="Confirmar"
+                        Click="ConfirmButton_Click" />
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>

@@ -1,0 +1,80 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <sys:String x:Key="Loc_HeaderSubtitle">Blend IT · tu diario local de trabajo por ticket</sys:String>
+    <sys:String x:Key="Loc_Timer">⏱ Contador</sys:String>
+    <sys:String x:Key="Loc_Insights">📊 Insights</sys:String>
+    <sys:String x:Key="Loc_ExportBackup">Exportar copia</sys:String>
+    <sys:String x:Key="Loc_ImportBackup">Importar copia</sys:String>
+    <sys:String x:Key="Loc_OpenDataFolder">Abrir datos locales</sys:String>
+
+    <sys:String x:Key="Loc_Now">AHORA</sys:String>
+    <sys:String x:Key="Loc_NoActiveTicket">Ningún ticket activo</sys:String>
+    <sys:String x:Key="Loc_TypeTicketToStart">Ingrese un ticket para comenzar.</sys:String>
+    <sys:String x:Key="Loc_TicketNumber">Número del ticket</sys:String>
+    <sys:String x:Key="Loc_StartTicket">Iniciar ticket</sys:String>
+    <sys:String x:Key="Loc_SwitchTicket">Iniciar / cambiar</sys:String>
+    <sys:String x:Key="Loc_Pause">Pausar</sys:String>
+    <sys:String x:Key="Loc_Resume">Reanudar</sys:String>
+
+    <sys:String x:Key="Loc_QuickNote">NOTA RÁPIDA</sys:String>
+    <sys:String x:Key="Loc_RecordVoice">🎙 Grabar</sys:String>
+    <sys:String x:Key="Loc_StopRecordVoice">⏹ Detener</sys:String>
+    <sys:String x:Key="Loc_AddNote">Añadir nota</sys:String>
+    <sys:String x:Key="Loc_NoteAutoTime">Guarda fecha y hora automáticamente</sys:String>
+
+    <sys:String x:Key="Loc_TicketRepository">REPOSITORIO DE TICKETS</sys:String>
+    <sys:String x:Key="Loc_SearchTicket">Buscar tickets</sys:String>
+
+    <sys:String x:Key="Loc_HistoryView">VISTA DEL HISTORIAL</sys:String>
+    <sys:String x:Key="Loc_Period">PERÍODO</sys:String>
+    <sys:String x:Key="Loc_PresetToday">Hoy</sys:String>
+    <sys:String x:Key="Loc_PresetWeek">Esta semana</sys:String>
+    <sys:String x:Key="Loc_PresetMonth">Este mes</sys:String>
+    <sys:String x:Key="Loc_PresetCustom">Personalizado</sys:String>
+    <sys:String x:Key="Loc_FromUntil">DESDE / HASTA</sys:String>
+    <sys:String x:Key="Loc_Until">hasta</sys:String>
+    <sys:String x:Key="Loc_Apply">Aplicar</sys:String>
+
+    <sys:String x:Key="Loc_TimeRegistered">tiempo registrado</sys:String>
+    <sys:String x:Key="Loc_TicketsUsed">tickets en el período</sys:String>
+    <sys:String x:Key="Loc_SessionsInPeriod">sesiones en el período</sys:String>
+    <sys:String x:Key="Loc_CopyTimesheet">Copiar a Timesheet</sys:String>
+    <sys:String x:Key="Loc_ExportCsv">Exportar CSV</sys:String>
+    <sys:String x:Key="Loc_FinishDay">Finalizar día</sys:String>
+
+    <sys:String x:Key="Loc_PeriodSessionsTitle">RESUMEN DEL PERÍODO</sys:String>
+    <sys:String x:Key="Loc_EditSession">Corregir sesión</sys:String>
+    <sys:String x:Key="Loc_DeleteSession">Eliminar sesión</sys:String>
+
+    <sys:String x:Key="Loc_SelectTicketPrompt">Seleccione un ticket del repositorio para registrar su análisis y documentación.</sys:String>
+    <sys:String x:Key="Loc_ExportReport">Exportar informe</sys:String>
+    <sys:String x:Key="Loc_DeleteTicket">Eliminar ticket</sys:String>
+    <sys:String x:Key="Loc_SaveDocs">Guardar documentación</sys:String>
+
+    <sys:String x:Key="Loc_ExpectedDocsTitle">DOCUMENTOS ESPERADOS Y ADJUNTOS</sys:String>
+    <sys:String x:Key="Loc_ExpectedDocsDesc">Use esta lista de verificación como apoyo. Arraste archivos aquí o haga clic en Adjuntar. Los archivos se guardan localmente.</sys:String>
+    <sys:String x:Key="Loc_AttachFile">Adjuntar archivo</sys:String>
+    <sys:String x:Key="Loc_OpenFile">Abrir</sys:String>
+    <sys:String x:Key="Loc_RemoveFile">Eliminar</sys:String>
+    <sys:String x:Key="Loc_DragOverlayText">📎 Suelte para adjuntar como 'Otros'</sys:String>
+
+    <sys:String x:Key="Loc_ContextLabel">Contexto / comprensión del problema</sys:String>
+    <sys:String x:Key="Loc_AnalysisLabel">Análisis técnico</sys:String>
+    <sys:String x:Key="Loc_ActionsLabel">Acciones realizadas</sys:String>
+    <sys:String x:Key="Loc_SolutionLabel">Solución / documentación</sys:String>
+    <sys:String x:Key="Loc_TestsLabel">Pruebas y evidencias</sys:String>
+    <sys:String x:Key="Loc_PendingLabel">Pendientes / próximos pasos</sys:String>
+    <sys:String x:Key="Loc_NotesHistory">HISTORIAL DE NOTAS</sys:String>
+    <sys:String x:Key="Loc_FooterText">Todos los datos se guardan localmente en este equipo.</sys:String>
+
+    <!-- Overlay & Dialogs -->
+    <sys:String x:Key="Loc_FloatingCounter">contador flotante</sys:String>
+    <sys:String x:Key="Loc_Mini">Mini</sys:String>
+    <sys:String x:Key="Loc_Open">Abrir</sys:String>
+    <sys:String x:Key="Loc_Hide">Ocultar</sys:String>
+    <sys:String x:Key="Loc_OpenApp">Abrir app</sys:String>
+    <sys:String x:Key="Loc_Record">Grabar</sys:String>
+
+</ResourceDictionary>

@@ -1,0 +1,78 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "Controlador/1.0.0": {
+        "dependencies": {
+          "Microsoft.Data.Sqlite.Core": "10.0.10",
+          "SQLitePCLRaw.provider.winsqlite3": "3.0.5"
+        },
+        "runtime": {
+          "Controlador.dll": {}
+        }
+      },
+      "Microsoft.Data.Sqlite.Core/10.0.10": {
+        "dependencies": {
+          "SQLitePCLRaw.core": "3.0.5"
+        },
+        "runtime": {
+          "lib/net8.0/Microsoft.Data.Sqlite.dll": {
+            "assemblyVersion": "10.0.10.0",
+            "fileVersion": "10.0.1026.32716"
+          }
+        }
+      },
+      "SQLitePCLRaw.core/3.0.5": {
+        "runtime": {
+          "lib/net8.0/SQLitePCLRaw.core.dll": {
+            "assemblyVersion": "3.0.5.3129",
+            "fileVersion": "3.0.5.3129"
+          }
+        }
+      },
+      "SQLitePCLRaw.provider.winsqlite3/3.0.5": {
+        "dependencies": {
+          "SQLitePCLRaw.core": "3.0.5"
+        },
+        "runtime": {
+          "lib/netstandard2.0/SQLitePCLRaw.provider.winsqlite3.dll": {
+            "assemblyVersion": "3.0.5.3129",
+            "fileVersion": "3.0.5.3129"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "Controlador/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Microsoft.Data.Sqlite.Core/10.0.10": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-TPCs0ldm7AWqcKmp6f/Xr+14sat7hx4rHfRlS4RgCURBH2thEWbAKEyX7cCWr63zVJVOJIJZTg2cBiUXa8ys6g==",
+      "path": "microsoft.data.sqlite.core/10.0.10",
+      "hashPath": "microsoft.data.sqlite.core.10.0.10.nupkg.sha512"
+    },
+    "SQLitePCLRaw.core/3.0.5": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-k81AYXXRCw3Zj8rOhyBoCsx/U97KYDFI2CSKr/ijl5BwpsW/hX/4kBiDmerFaoust8nxBwa0IHQFw8MmSHRtnQ==",
+      "path": "sqlitepclraw.core/3.0.5",
+      "hashPath": "sqlitepclraw.core.3.0.5.nupkg.sha512"
+    },
+    "SQLitePCLRaw.provider.winsqlite3/3.0.5": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-V1Z/MmQMA8D0yCRnWEndX5x8TB5bh/W6m2aCgcamOAYEHkBISZApm5dUQh1A/7Z/fyrtr65kln+yh6vo+vKVkQ==",
+      "path": "sqlitepclraw.provider.winsqlite3/3.0.5",
+      "hashPath": "sqlitepclraw.provider.winsqlite3.3.0.5.nupkg.sha512"
+    }
+  }
+}

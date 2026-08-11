@@ -1,0 +1,80 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <sys:String x:Key="Loc_HeaderSubtitle">Blend IT · seu diário local de trabalho por chamado</sys:String>
+    <sys:String x:Key="Loc_Timer">⏱ Contador</sys:String>
+    <sys:String x:Key="Loc_Insights">📊 Insights</sys:String>
+    <sys:String x:Key="Loc_ExportBackup">Exportar backup</sys:String>
+    <sys:String x:Key="Loc_ImportBackup">Importar backup</sys:String>
+    <sys:String x:Key="Loc_OpenDataFolder">Abrir dados locais</sys:String>
+
+    <sys:String x:Key="Loc_Now">AGORA</sys:String>
+    <sys:String x:Key="Loc_NoActiveTicket">Nenhum chamado ativo</sys:String>
+    <sys:String x:Key="Loc_TypeTicketToStart">Digite um chamado para começar.</sys:String>
+    <sys:String x:Key="Loc_TicketNumber">Número do chamado</sys:String>
+    <sys:String x:Key="Loc_StartTicket">Iniciar chamado</sys:String>
+    <sys:String x:Key="Loc_SwitchTicket">Iniciar / trocar</sys:String>
+    <sys:String x:Key="Loc_Pause">Pausar</sys:String>
+    <sys:String x:Key="Loc_Resume">Retomar</sys:String>
+
+    <sys:String x:Key="Loc_QuickNote">ANOTAÇÃO RÁPIDA</sys:String>
+    <sys:String x:Key="Loc_RecordVoice">🎙 Gravar</sys:String>
+    <sys:String x:Key="Loc_StopRecordVoice">⏹ Parar</sys:String>
+    <sys:String x:Key="Loc_AddNote">Adicionar nota</sys:String>
+    <sys:String x:Key="Loc_NoteAutoTime">Salva data e horário automaticamente</sys:String>
+
+    <sys:String x:Key="Loc_TicketRepository">REPOSITÓRIO DE CHAMADOS</sys:String>
+    <sys:String x:Key="Loc_SearchTicket">Buscar chamado</sys:String>
+
+    <sys:String x:Key="Loc_HistoryView">VISÃO DO HISTÓRICO</sys:String>
+    <sys:String x:Key="Loc_Period">PERÍODO</sys:String>
+    <sys:String x:Key="Loc_PresetToday">Hoje</sys:String>
+    <sys:String x:Key="Loc_PresetWeek">Esta semana</sys:String>
+    <sys:String x:Key="Loc_PresetMonth">Este mês</sys:String>
+    <sys:String x:Key="Loc_PresetCustom">Personalizado</sys:String>
+    <sys:String x:Key="Loc_FromUntil">DE / ATÉ</sys:String>
+    <sys:String x:Key="Loc_Until">até</sys:String>
+    <sys:String x:Key="Loc_Apply">Aplicar</sys:String>
+
+    <sys:String x:Key="Loc_TimeRegistered">tempo registrado</sys:String>
+    <sys:String x:Key="Loc_TicketsUsed">chamados no período</sys:String>
+    <sys:String x:Key="Loc_SessionsInPeriod">sessões no período</sys:String>
+    <sys:String x:Key="Loc_CopyTimesheet">Copiar p/ Timesheet</sys:String>
+    <sys:String x:Key="Loc_ExportCsv">Exportar CSV</sys:String>
+    <sys:String x:Key="Loc_FinishDay">Finalizar dia</sys:String>
+
+    <sys:String x:Key="Loc_PeriodSessionsTitle">RESUMO DO PERÍODO</sys:String>
+    <sys:String x:Key="Loc_EditSession">Corrigir sessão</sys:String>
+    <sys:String x:Key="Loc_DeleteSession">Excluir sessão</sys:String>
+
+    <sys:String x:Key="Loc_SelectTicketPrompt">Selecione um chamado no repositório para registrar a análise e a documentação.</sys:String>
+    <sys:String x:Key="Loc_ExportReport">Exportar relatório</sys:String>
+    <sys:String x:Key="Loc_DeleteTicket">Excluir chamado</sys:String>
+    <sys:String x:Key="Loc_SaveDocs">Salvar documentação</sys:String>
+
+    <sys:String x:Key="Loc_ExpectedDocsTitle">DOCUMENTOS ESPERADOS E ANEXOS</sys:String>
+    <sys:String x:Key="Loc_ExpectedDocsDesc">Use este checklist como apoio. Arraste arquivos aqui ou clique em Anexar. Os arquivos são copiados para o repositório local deste chamado.</sys:String>
+    <sys:String x:Key="Loc_AttachFile">Anexar arquivo</sys:String>
+    <sys:String x:Key="Loc_OpenFile">Abrir</sys:String>
+    <sys:String x:Key="Loc_RemoveFile">Remover</sys:String>
+    <sys:String x:Key="Loc_DragOverlayText">📎 Solte para anexar como 'Outros'</sys:String>
+
+    <sys:String x:Key="Loc_ContextLabel">Contexto / entendimento do problema</sys:String>
+    <sys:String x:Key="Loc_AnalysisLabel">Análise técnica</sys:String>
+    <sys:String x:Key="Loc_ActionsLabel">Atividades executadas</sys:String>
+    <sys:String x:Key="Loc_SolutionLabel">Solução / documentação</sys:String>
+    <sys:String x:Key="Loc_TestsLabel">Testes e evidências</sys:String>
+    <sys:String x:Key="Loc_PendingLabel">Pendências / próximos passos</sys:String>
+    <sys:String x:Key="Loc_NotesHistory">HISTÓRICO DE NOTAS</sys:String>
+    <sys:String x:Key="Loc_FooterText">Tudo é salvo apenas neste computador.</sys:String>
+
+    <!-- Overlay & Dialogs -->
+    <sys:String x:Key="Loc_FloatingCounter">contador flutuante</sys:String>
+    <sys:String x:Key="Loc_Mini">Mini</sys:String>
+    <sys:String x:Key="Loc_Open">Abrir</sys:String>
+    <sys:String x:Key="Loc_Hide">Ocultar</sys:String>
+    <sys:String x:Key="Loc_OpenApp">Abrir app</sys:String>
+    <sys:String x:Key="Loc_Record">Gravar</sys:String>
+
+</ResourceDictionary>
